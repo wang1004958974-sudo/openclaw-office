@@ -9,10 +9,10 @@ const Scene3D = lazy(() => import("@/components/office-3d/Scene3D"));
 
 function Scene3DFallback() {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-gray-50">
+    <div className="flex h-full w-full items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="flex flex-col items-center gap-3">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-        <span className="text-sm text-gray-500">加载 3D 场景...</span>
+        <span className="text-sm text-gray-500 dark:text-gray-400">加载 3D 场景...</span>
       </div>
     </div>
   );

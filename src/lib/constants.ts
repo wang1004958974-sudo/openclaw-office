@@ -17,6 +17,13 @@ export const ZONE_COLORS = {
   lounge: "#e8e5f0",
 } as const;
 
+export const ZONE_COLORS_DARK = {
+  desk: "#1e293b",
+  meeting: "#1a2744",
+  hotDesk: "#1e2433",
+  lounge: "#231e33",
+} as const;
+
 export const STATUS_COLORS: Record<AgentVisualStatus, string> = {
   idle: "#22c55e",
   thinking: "#3b82f6",

@@ -28,10 +28,10 @@ export function TopBar({ isMobile = false }: TopBarProps) {
   const statusCfg = STATUS_CONFIG[connectionStatus];
 
   return (
-    <header className="flex h-12 shrink-0 items-center border-b border-gray-200 bg-white px-4 shadow-sm">
+    <header className="flex h-12 shrink-0 items-center border-b border-gray-200 bg-white px-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold tracking-tight text-gray-800">OpenClaw Office</h1>
-        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">v0.1.0</span>
+        <h1 className="text-lg font-semibold tracking-tight text-gray-800 dark:text-gray-100">OpenClaw Office</h1>
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">v0.1.0</span>
       </div>
 
       <ViewModeSwitch
@@ -42,15 +42,15 @@ export function TopBar({ isMobile = false }: TopBarProps) {
       />
       <ThemeToggle theme={theme} setTheme={setTheme} />
 
-      <div className="mx-8 flex items-center gap-6 text-sm text-gray-500">
+      <div className="mx-8 flex items-center gap-6 text-sm text-gray-500 dark:text-gray-400">
         <span>
           活跃{" "}
-          <strong className="text-gray-800">
+          <strong className="text-gray-800 dark:text-gray-200">
             {metrics.activeAgents}/{metrics.totalAgents}
           </strong>
         </span>
         <span>
-          Tokens <strong className="text-gray-800">{formatTokens(metrics.totalTokens)}</strong>
+          Tokens <strong className="text-gray-800 dark:text-gray-200">{formatTokens(metrics.totalTokens)}</strong>
         </span>
       </div>
 
@@ -62,7 +62,7 @@ export function TopBar({ isMobile = false }: TopBarProps) {
             animation: statusCfg.pulse ? "pulse 1.5s ease-in-out infinite" : "none",
           }}
         />
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
           {connectionError && connectionStatus === "error" ? connectionError : statusCfg.label}
         </span>
       </div>
@@ -87,7 +87,7 @@ function ViewModeSwitch({
   ];
 
   return (
-    <div className="ml-6 flex items-center rounded-md bg-gray-100 p-0.5">
+    <div className="ml-6 flex items-center rounded-md bg-gray-100 p-0.5 dark:bg-gray-800">
       {modes.map(({ key, label }) => {
         const isActive = viewMode === key;
         const disabled = key === "3d" && (!webglAvailable || isMobile);
@@ -106,8 +106,8 @@ function ViewModeSwitch({
               isActive
                 ? "bg-blue-600 text-white shadow-sm"
                 : disabled
-                  ? "cursor-not-allowed text-gray-300"
-                  : "text-gray-500 hover:text-gray-800"
+                  ? "cursor-not-allowed text-gray-300 dark:text-gray-600"
+                  : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
             }`}
           >
             {label}
@@ -123,7 +123,7 @@ function ThemeToggle({ theme, setTheme }: { theme: ThemeMode; setTheme: (t: Them
     <button
       onClick={() => setTheme(theme === "light" ? "dark" : "light")}
       title={theme === "light" ? "切换到暗色模式" : "切换到亮色模式"}
-      className="ml-2 flex h-7 w-7 items-center justify-center rounded-md text-base transition-colors hover:bg-gray-200"
+      className="ml-2 flex h-7 w-7 items-center justify-center rounded-md text-base transition-colors hover:bg-gray-200 dark:hover:bg-gray-700"
     >
       {theme === "light" ? "🌙" : "☀️"}
     </button>

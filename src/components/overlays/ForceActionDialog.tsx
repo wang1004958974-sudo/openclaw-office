@@ -60,14 +60,14 @@ export function ForceActionDialog({ wsClient }: ForceActionDialogProps) {
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div
-        className="w-[400px] rounded-xl border border-gray-200 bg-white p-5 shadow-2xl"
+        className="w-[400px] rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center gap-3">
           <SvgAvatar agentId={agent.id} size={40} />
           <div>
-            <div className="text-sm font-semibold text-gray-800">{agent.name}</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-sm font-semibold text-gray-800 dark:text-gray-200">{agent.name}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {dialog.mode === "send-message" ? "发送消息" : "终止确认"}
             </div>
           </div>
@@ -82,14 +82,14 @@ export function ForceActionDialog({ wsClient }: ForceActionDialogProps) {
               placeholder="输入指令..."
               rows={4}
               disabled={loading}
-              className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50"
+              className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
             />
             {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
             <div className="mt-3 flex justify-end gap-2">
               <button
                 onClick={closeDialog}
                 disabled={loading}
-                className="rounded-lg px-4 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                className="rounded-lg px-4 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 取消
               </button>
@@ -105,7 +105,7 @@ export function ForceActionDialog({ wsClient }: ForceActionDialogProps) {
           </>
         ) : (
           <>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               确定要终止 <strong>{agent.name}</strong> 的当前运行吗？此操作不可撤销。
             </p>
             {error && <div className="mt-2 text-xs text-red-500">{error}</div>}
@@ -113,7 +113,7 @@ export function ForceActionDialog({ wsClient }: ForceActionDialogProps) {
               <button
                 onClick={closeDialog}
                 disabled={loading}
-                className="rounded-lg px-4 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                className="rounded-lg px-4 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-800"
               >
                 取消
               </button>

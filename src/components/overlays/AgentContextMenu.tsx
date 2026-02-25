@@ -127,9 +127,9 @@ export function AgentContextMenu() {
     <div
       style={menuStyle}
       onClick={(e) => e.stopPropagation()}
-      className="min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl"
+      className="min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-xl dark:border-gray-700 dark:bg-gray-900"
     >
-      <div className="border-b border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500">
+      <div className="border-b border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-500 dark:border-gray-800 dark:text-gray-400">
         {agent.name}
       </div>
       {items.map((item) => (
@@ -143,7 +143,7 @@ export function AgentContextMenu() {
           disabled={item.disabled}
           title={item.tooltip}
           className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors ${
-            item.disabled ? "cursor-not-allowed text-gray-300" : "text-gray-700 hover:bg-gray-50"
+            item.disabled ? "cursor-not-allowed text-gray-300 dark:text-gray-600" : "text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
           }`}
         >
           <span className="w-5 text-center">{item.icon}</span>

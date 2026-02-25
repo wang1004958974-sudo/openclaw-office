@@ -23,7 +23,7 @@ export function TokenLineChart() {
 
   if (tokenHistory.length < 2) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-gray-500">
+      <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         暂无数据，等待 usage 数据...
       </div>
     );
@@ -74,8 +74,8 @@ export function TokenLineChart() {
               }),
             ];
             return (
-              <div className="rounded border border-gray-200 bg-white px-2 py-1 text-xs shadow">
-                <div className="font-medium text-gray-700">{label}</div>
+              <div className="rounded border border-gray-200 bg-white px-2 py-1 text-xs shadow dark:border-gray-700 dark:bg-gray-900">
+                <div className="font-medium text-gray-700 dark:text-gray-300">{label}</div>
                 {lines}
               </div>
             );

@@ -11,11 +11,13 @@ export function AgentDot({ agent }: AgentDotProps) {
   const selectedAgentId = useOfficeStore((s) => s.selectedAgentId);
   const selectAgent = useOfficeStore((s) => s.selectAgent);
   const openContextMenu = useOfficeStore((s) => s.openContextMenu);
+  const theme = useOfficeStore((s) => s.theme);
   const [hovered, setHovered] = useState(false);
 
   const isSelected = selectedAgentId === agent.id;
   const radius = isSelected ? 15 : 12;
   const color = STATUS_COLORS[agent.status];
+  const isDark = theme === "dark";
 
   return (
     <g
@@ -61,11 +63,11 @@ export function AgentDot({ agent }: AgentDotProps) {
             width={120}
             height={28}
             rx={4}
-            fill="white"
-            stroke="#d1d5db"
+            fill={isDark ? "#1e293b" : "white"}
+            stroke={isDark ? "#475569" : "#d1d5db"}
             strokeWidth={0.5}
           />
-          <text textAnchor="middle" dominantBaseline="central" fill="#374151" fontSize={10} y={-2}>
+          <text textAnchor="middle" dominantBaseline="central" fill={isDark ? "#e2e8f0" : "#374151"} fontSize={10} y={-2}>
             {agent.name} · {STATUS_LABELS[agent.status]}
           </text>
         </g>

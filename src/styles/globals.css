@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --zone-desk: #e8edf5;
+  --zone-meeting: #e0eaf5;
+  --zone-hotDesk: #e5e8f0;
+  --zone-lounge: #e8e5f0;
+  --zone-stroke: #c8d0dc;
+  --zone-label: #64748b;
+  --dot-tooltip-bg: white;
+  --dot-tooltip-stroke: #d1d5db;
+  --dot-tooltip-text: #374151;
+  --svg-link-color: #60a5fa;
+}
+
+.dark {
+  --zone-desk: #1e293b;
+  --zone-meeting: #1a2744;
+  --zone-hotDesk: #1e2433;
+  --zone-lounge: #231e33;
+  --zone-stroke: #334155;
+  --zone-label: #94a3b8;
+  --dot-tooltip-bg: #1e293b;
+  --dot-tooltip-stroke: #475569;
+  --dot-tooltip-text: #e2e8f0;
+  --svg-link-color: #60a5fa;
+}
+
 @keyframes pulse {
   0%,
   100% {

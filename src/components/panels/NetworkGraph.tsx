@@ -40,7 +40,9 @@ function mapToolCountToRadius(count: number, maxCount: number): number {
 export function NetworkGraph() {
   const agents = useOfficeStore((s) => s.agents);
   const links = useOfficeStore((s) => s.links);
+  const theme = useOfficeStore((s) => s.theme);
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const isDark = theme === "dark";
 
   const { topAgents, positions, maxToolCount } = useMemo(() => {
     const list = Array.from(agents.values())
@@ -67,7 +69,7 @@ export function NetworkGraph() {
 
   if (topAgents.length === 0 && links.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-gray-500">
+      <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         暂无 Agent 关系数据
       </div>
     );
@@ -124,7 +126,7 @@ export function NetworkGraph() {
               stroke={isHovered ? "#1e40af" : "transparent"}
               strokeWidth={2}
             />
-            <text x={pos.x} y={pos.y + r + 10} textAnchor="middle" fontSize={9} fill="#374151">
+            <text x={pos.x} y={pos.y + r + 10} textAnchor="middle" fontSize={9} fill={isDark ? "#e2e8f0" : "#374151"}>
               {agent.name.length > 8 ? `${agent.name.slice(0, 6)}…` : agent.name}
             </text>
           </g>

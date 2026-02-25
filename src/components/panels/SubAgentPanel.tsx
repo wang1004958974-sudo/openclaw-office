@@ -18,9 +18,9 @@ export function SubAgentPanel() {
   }
 
   return (
-    <div className="border-t border-gray-200">
+    <div className="border-t border-gray-200 dark:border-gray-700">
       <div className="px-3 py-1.5">
-        <span className="text-xs font-medium text-gray-500">Sub-Agents ({subAgents.length})</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Sub-Agents ({subAgents.length})</span>
       </div>
       <div className="max-h-48 overflow-y-auto">
         {subAgents.map((sub) => {
@@ -31,12 +31,12 @@ export function SubAgentPanel() {
             <button
               key={sub.id}
               onClick={() => selectAgent(sub.id)}
-              className="flex w-full items-start gap-2 border-t border-gray-50 px-3 py-2 text-left transition-colors hover:bg-blue-50"
+              className="flex w-full items-start gap-2 border-t border-gray-50 px-3 py-2 text-left transition-colors hover:bg-blue-50 dark:border-gray-800 dark:hover:bg-blue-950"
             >
               <Avatar agentId={sub.id} agentName={sub.name} size={24} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="truncate text-xs font-medium text-gray-800">{sub.name}</span>
+                  <span className="truncate text-xs font-medium text-gray-800 dark:text-gray-200">{sub.name}</span>
                   <span
                     className="inline-flex items-center rounded px-1 py-0.5 text-[9px] font-medium text-white"
                     style={{

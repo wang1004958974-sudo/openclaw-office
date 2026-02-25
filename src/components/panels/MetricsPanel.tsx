@@ -59,25 +59,25 @@ export function MetricsPanel() {
   ];
 
   return (
-    <div className="flex flex-col border-b border-gray-100">
+    <div className="flex flex-col border-b border-gray-100 dark:border-gray-800">
       <div className="grid grid-cols-2 gap-1.5 p-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg bg-gray-50 px-2 py-1.5 text-center">
+          <div key={card.label} className="rounded-lg bg-gray-50 px-2 py-1.5 text-center dark:bg-gray-800">
             <div className="text-lg font-bold" style={{ color: card.color }}>
               {card.value}
             </div>
-            <div className="text-[10px] text-gray-500">{card.label}</div>
+            <div className="text-[10px] text-gray-500 dark:text-gray-400">{card.label}</div>
           </div>
         ))}
       </div>
-      <div className="flex gap-1 border-t border-gray-100 px-2 py-1">
+      <div className="flex gap-1 border-t border-gray-100 px-2 py-1 dark:border-gray-800">
         {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setActiveTab(t.id)}
             className={`rounded px-2 py-1 text-xs ${
-              activeTab === t.id ? "bg-gray-200 font-medium" : "text-gray-600 hover:bg-gray-100"
+              activeTab === t.id ? "bg-gray-200 font-medium dark:bg-gray-700 dark:text-gray-200" : "text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
             }`}
           >
             {t.label}

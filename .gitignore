@@ -26,3 +26,6 @@ coverage/
 .agent/
 .agents/
 .claude/settings.local.json
+
+#
+ClawX/

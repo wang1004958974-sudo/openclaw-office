@@ -7,20 +7,28 @@ const COLS = 24;
 const CELL_W = 10;
 const CELL_H = 14;
 
-const COLOR_SCALE = [
+const COLOR_SCALE_LIGHT = [
   { max: 0, color: "#f3f4f6" },
   { max: 5, color: "#bbf7d0" },
   { max: 10, color: "#4ade80" },
   { max: Infinity, color: "#16a34a" },
 ];
 
-function getColor(count: number): string {
-  for (const s of COLOR_SCALE) {
+const COLOR_SCALE_DARK = [
+  { max: 0, color: "#1e293b" },
+  { max: 5, color: "#14532d" },
+  { max: 10, color: "#166534" },
+  { max: Infinity, color: "#22c55e" },
+];
+
+function getColor(count: number, isDark: boolean): string {
+  const scale = isDark ? COLOR_SCALE_DARK : COLOR_SCALE_LIGHT;
+  for (const s of scale) {
     if (count <= s.max) {
       return s.color;
     }
   }
-  return COLOR_SCALE[COLOR_SCALE.length - 1].color;
+  return scale[scale.length - 1].color;
 }
 
 function buildHeatmapData(
@@ -59,6 +67,8 @@ function buildHeatmapData(
 
 export function ActivityHeatmap() {
   const eventHistory = useOfficeStore((s) => s.eventHistory);
+  const theme = useOfficeStore((s) => s.theme);
+  const isDark = theme === "dark";
   const [tooltip, setTooltip] = useState<{
     agentName: string;
     hour: string;
@@ -71,7 +81,7 @@ export function ActivityHeatmap() {
 
   if (rows.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-gray-500">
+      <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         暂无活跃数据
       </div>
     );
@@ -85,7 +95,7 @@ export function ActivityHeatmap() {
       <svg width={COLS * CELL_W + 60} height={ROWS * CELL_H + 24} className="overflow-visible">
         {rows.map((row, ri) => (
           <g key={row.agentId}>
-            <text x={0} y={ri * CELL_H + CELL_H / 2 + 4} fontSize={9} fill="#374151">
+            <text x={0} y={ri * CELL_H + CELL_H / 2 + 4} fontSize={9} fill={isDark ? "#e2e8f0" : "#374151"}>
               {row.agentName.length > 10 ? `${row.agentName.slice(0, 8)}…` : row.agentName}
             </text>
             {row.counts.map((count, ci) => {
@@ -101,7 +111,7 @@ export function ActivityHeatmap() {
                   y={y}
                   width={CELL_W - 1}
                   height={CELL_H - 1}
-                  fill={getColor(count)}
+                  fill={getColor(count, isDark)}
                   onMouseEnter={(e) => {
                     const rect = (e.target as SVGRectElement).getBoundingClientRect();
                     setTooltip({
@@ -121,7 +131,7 @@ export function ActivityHeatmap() {
       </svg>
       {tooltip && (
         <div
-          className="fixed z-10 rounded border border-gray-200 bg-white px-2 py-1 text-xs shadow"
+          className="fixed z-10 rounded border border-gray-200 bg-white px-2 py-1 text-xs shadow dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
           style={{ left: tooltip.x, top: tooltip.y - 32 }}
         >
           {tooltip.agentName} | {tooltip.hour} | {tooltip.count} events

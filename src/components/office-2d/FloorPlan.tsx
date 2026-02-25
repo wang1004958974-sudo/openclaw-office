@@ -1,5 +1,5 @@
 import { SpeechBubbleOverlay } from "@/components/overlays/SpeechBubble";
-import { SVG_WIDTH, SVG_HEIGHT, ZONES, ZONE_COLORS } from "@/lib/constants";
+import { SVG_WIDTH, SVG_HEIGHT, ZONES, ZONE_COLORS, ZONE_COLORS_DARK } from "@/lib/constants";
 import { useOfficeStore } from "@/store/office-store";
 import { AgentDot } from "./AgentDot";
 import { ConnectionLine } from "./ConnectionLine";
@@ -8,11 +8,15 @@ import { ZoneLabel } from "./ZoneLabel";
 export function FloorPlan() {
   const agents = useOfficeStore((s) => s.agents);
   const links = useOfficeStore((s) => s.links);
+  const theme = useOfficeStore((s) => s.theme);
 
   const agentList = Array.from(agents.values());
+  const isDark = theme === "dark";
+  const zoneColors = isDark ? ZONE_COLORS_DARK : ZONE_COLORS;
+  const zoneStroke = isDark ? "#334155" : "#c8d0dc";
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full bg-gray-50 dark:bg-gray-950">
       <svg
         viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
         className="h-full w-full"
@@ -27,8 +31,8 @@ export function FloorPlan() {
             width={zone.width}
             height={zone.height}
             rx={8}
-            fill={ZONE_COLORS[key as keyof typeof ZONE_COLORS]}
-            stroke="#c8d0dc"
+            fill={zoneColors[key as keyof typeof ZONE_COLORS]}
+            stroke={zoneStroke}
             strokeWidth={1}
           />
         ))}

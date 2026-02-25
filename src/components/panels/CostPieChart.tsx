@@ -21,7 +21,7 @@ export function CostPieChart() {
 
   if (entries.length === 0) {
     return (
-      <div className="flex h-48 items-center justify-center text-sm text-gray-500">
+      <div className="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400">
         暂无成本数据
       </div>
     );
@@ -62,7 +62,7 @@ export function CostPieChart() {
         </PieChart>
       </ResponsiveContainer>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <span className="text-sm font-bold text-gray-700">{formatTokens(total)}</span>
+        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{formatTokens(total)}</span>
       </div>
     </div>
   );

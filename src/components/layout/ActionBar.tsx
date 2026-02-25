@@ -28,7 +28,7 @@ export function ActionBar({ wsClient }: ActionBarProps) {
         opacity: visible ? 1 : 0,
       }}
     >
-      <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-gray-200/50 bg-white/70 px-4 py-2 shadow-lg backdrop-blur-sm">
+      <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-gray-200/50 bg-white/70 px-4 py-2 shadow-lg backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/70">
         <PauseButton
           agentId={selectedAgentId}
           wsClient={wsClient}
@@ -88,17 +88,17 @@ function PauseButton({
         onClick={handleClick}
         onBlur={() => setShowTip(false)}
         disabled={busy}
-        className={`flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium shadow-sm transition-colors ${
+        className={`flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium shadow-sm transition-colors dark:bg-gray-800/90 ${
           disabled
             ? "cursor-not-allowed text-gray-400"
-            : "text-gray-700 hover:bg-white hover:text-gray-900"
+            : "text-gray-700 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         }`}
       >
         <span>⏸</span>
         <span>暂停</span>
       </button>
       {showTip && tooltip && (
-        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg">
+        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg dark:bg-gray-700">
           {tooltip}
         </div>
       )}
@@ -114,13 +114,13 @@ function SpawnButton() {
       <button
         onClick={() => setShowTip((v) => !v)}
         onBlur={() => setShowTip(false)}
-        className="flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-white hover:text-gray-900"
+        className="flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-white hover:text-gray-900 dark:bg-gray-800/90 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
       >
         <span>🔀</span>
         <span>派生子Agent</span>
       </button>
       {showTip && (
-        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg">
+        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg dark:bg-gray-700">
           功能开发中
         </div>
       )}
@@ -154,17 +154,17 @@ function DialogButton({
           }
         }}
         onBlur={() => setShowTip(false)}
-        className={`flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium shadow-sm transition-colors ${
+        className={`flex items-center gap-1.5 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium shadow-sm transition-colors dark:bg-gray-800/90 ${
           disabled
             ? "cursor-not-allowed text-gray-400"
-            : "text-gray-700 hover:bg-white hover:text-gray-900"
+            : "text-gray-700 hover:bg-white hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
         }`}
       >
         <span>{icon}</span>
         <span>{label}</span>
       </button>
       {showTip && tooltip && (
-        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg">
+        <div className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white shadow-lg dark:bg-gray-700">
           {tooltip}
         </div>
       )}

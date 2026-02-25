@@ -311,7 +311,7 @@ export function OfficeLayout3D() {
       <ZoneFloor position={[12, 0.015, 9]} size={[6.5, 5]} color="#40a060" />
 
       {/* === Zone Labels === */}
-      <ZoneLabel position={[1.5, 0.05, 0.8]} label="工位区" color="#2563eb" />
+      <ZoneLabel position={[1.5, 0.05, 0.8]} label="固定工位区" color="#2563eb" />
       <ZoneLabel position={[9.5, 0.05, 0.8]} label="会议区" color="#7c3aed" />
       <ZoneLabel position={[1.5, 0.05, 6.8]} label="热工位区" color="#c2410c" />
       <ZoneLabel position={[9.5, 0.05, 6.8]} label="休息区" color="#15803d" />

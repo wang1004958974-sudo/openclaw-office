@@ -38,9 +38,9 @@ export function EventTimeline() {
   };
 
   return (
-    <div className="flex flex-col border-t border-gray-200">
+    <div className="flex flex-col border-t border-gray-200 dark:border-gray-700">
       <div className="flex items-center justify-between px-3 py-1.5">
-        <span className="text-xs font-medium text-gray-500">事件时间轴</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">事件时间轴</span>
         {!autoScroll && eventHistory.length > 0 && (
           <button
             onClick={() => {
@@ -60,7 +60,7 @@ export function EventTimeline() {
           <button
             key={`${evt.timestamp}-${evt.agentId}-${i}`}
             onClick={() => selectAgent(evt.agentId)}
-            className="flex w-full items-start gap-1.5 border-t border-gray-100 px-3 py-1 text-left text-xs hover:bg-gray-50"
+            className="flex w-full items-start gap-1.5 border-t border-gray-100 px-3 py-1 text-left text-xs hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800"
           >
             <span className="mt-0.5 shrink-0 text-gray-400">
               {new Date(evt.timestamp).toLocaleTimeString("en-US", {
@@ -79,11 +79,11 @@ export function EventTimeline() {
             >
               {evt.agentName}
             </span>
-            <span className="min-w-0 truncate text-gray-500">{evt.summary}</span>
+            <span className="min-w-0 truncate text-gray-500 dark:text-gray-400">{evt.summary}</span>
           </button>
         ))}
         {displayEvents.length === 0 && (
-          <div className="py-3 text-center text-xs text-gray-400">暂无事件</div>
+          <div className="py-3 text-center text-xs text-gray-400 dark:text-gray-500">暂无事件</div>
         )}
       </div>
     </div>
