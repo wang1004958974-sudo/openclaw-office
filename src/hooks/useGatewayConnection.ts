@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { GatewayRpcClient } from "@/gateway/rpc-client";
 import { initAdapter } from "@/gateway/adapter-provider";
+import { GatewayRpcClient } from "@/gateway/rpc-client";
 import type {
   AgentEventPayload,
   AgentSummary,
@@ -27,6 +27,8 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
   const initAgents = useOfficeStore((s) => s.initAgents);
   const processAgentEvent = useOfficeStore((s) => s.processAgentEvent);
   const setOperatorScopes = useOfficeStore((s) => s.setOperatorScopes);
+  const setMaxSubAgents = useOfficeStore((s) => s.setMaxSubAgents);
+  const setAgentToAgentConfig = useOfficeStore((s) => s.setAgentToAgentConfig);
 
   useEffect(() => {
     if (!url) {
@@ -61,6 +63,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
         setOperatorScopes(Array.isArray(scopes) ? (scopes as string[]) : ["operator"]);
 
         void initAdapter("ws", { wsClient: ws, rpcClient: rpc });
+        void fetchGatewayConfig(rpc, setMaxSubAgents, setAgentToAgentConfig);
       }
     });
 
@@ -85,7 +88,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
       rpcRef.current = null;
       throttleRef.current = null;
     };
-  }, [url, token, setConnectionStatus, initAgents, processAgentEvent, setOperatorScopes]);
+  }, [url, token, setConnectionStatus, initAgents, processAgentEvent, setOperatorScopes, setMaxSubAgents, setAgentToAgentConfig]);
 
   useSubAgentPoller(rpcRef);
   useUsagePoller(rpcRef);
@@ -111,5 +114,41 @@ function initAgentsFromSnapshot(
   const health = snapshot?.health as HealthSnapshot | undefined;
   if (health?.agents) {
     initAgents(healthAgentsToSummaries(health));
+  }
+}
+
+interface ConfigGetResponse {
+  value?: unknown;
+}
+
+async function fetchGatewayConfig(
+  rpc: GatewayRpcClient,
+  setMaxSubAgents: (n: number) => void,
+  setAgentToAgentConfig: (config: { enabled: boolean; allow: string[] }) => void,
+): Promise<void> {
+  try {
+    const resp = await rpc.request<ConfigGetResponse>("config.get", {
+      keys: ["agents.defaults.subagents", "tools.agentToAgent"],
+    });
+    const val = resp.value as Record<string, unknown> | undefined;
+    if (val) {
+      const subagents = val["agents.defaults.subagents"] as
+        | { maxConcurrent?: number }
+        | undefined;
+      if (subagents?.maxConcurrent && subagents.maxConcurrent >= 1 && subagents.maxConcurrent <= 50) {
+        setMaxSubAgents(subagents.maxConcurrent);
+      }
+      const a2a = val["tools.agentToAgent"] as
+        | { enabled?: boolean; allow?: string[] }
+        | undefined;
+      if (a2a) {
+        setAgentToAgentConfig({
+          enabled: a2a.enabled ?? false,
+          allow: Array.isArray(a2a.allow) ? a2a.allow : [],
+        });
+      }
+    }
+  } catch {
+    // Gateway doesn't support config.get or permission denied — use defaults
   }
 }

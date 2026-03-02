@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { SpeechBubbleOverlay } from "@/components/overlays/SpeechBubble";
+import type { VisualAgent } from "@/gateway/types";
 import {
   SVG_WIDTH,
   SVG_HEIGHT,
@@ -12,10 +13,9 @@ import { calculateDeskSlots, calculateMeetingSeatsSvg } from "@/lib/position-all
 import { useOfficeStore } from "@/store/office-store";
 import { AgentAvatar } from "./AgentAvatar";
 import { ConnectionLine } from "./ConnectionLine";
-import { ZoneLabel } from "./ZoneLabel";
 import { DeskUnit } from "./DeskUnit";
 import { MeetingTable, Sofa, Plant, CoffeeCup, Chair } from "./furniture";
-import type { VisualAgent } from "@/gateway/types";
+import { ZoneLabel } from "./ZoneLabel";
 
 export function FloorPlan() {
   const agents = useOfficeStore((s) => s.agents);
@@ -31,13 +31,16 @@ export function FloorPlan() {
     [agentList],
   );
   const hotDeskAgents = useMemo(
-    () => agentList.filter((a) => a.zone === "hotDesk" || a.isSubAgent),
+    () => agentList.filter((a) => a.zone === "hotDesk"),
     [agentList],
   );
-  const meetingAgents = useMemo(
-    () => agentList.filter((a) => a.zone === "meeting"),
+  const loungeAgents = useMemo(
+    () => agentList.filter((a) => a.zone === "lounge"),
     [agentList],
   );
+  const meetingAgents = useMemo(() => agentList.filter((a) => a.zone === "meeting"), [agentList]);
+
+  const maxSubAgents = useOfficeStore((s) => s.maxSubAgents);
 
   const deskSlots = useMemo(
     () => calculateDeskSlots(ZONES.desk, deskAgents.length, Math.max(deskAgents.length, 4)),
@@ -45,8 +48,13 @@ export function FloorPlan() {
   );
 
   const hotDeskSlots = useMemo(
-    () => calculateDeskSlots(ZONES.hotDesk, hotDeskAgents.length, Math.max(hotDeskAgents.length, 2)),
-    [hotDeskAgents.length],
+    () =>
+      calculateDeskSlots(
+        ZONES.hotDesk,
+        hotDeskAgents.length,
+        Math.max(hotDeskAgents.length, maxSubAgents),
+      ),
+    [hotDeskAgents.length, maxSubAgents],
   );
 
   const meetingCenter = {
@@ -120,7 +128,9 @@ export function FloorPlan() {
             y={zone.y}
             width={zone.width}
             height={zone.height}
-            fill={key === "lounge" ? "url(#lounge-carpet)" : colors[key as keyof typeof ZONE_COLORS]}
+            fill={
+              key === "lounge" ? "url(#lounge-carpet)" : colors[key as keyof typeof ZONE_COLORS]
+            }
           />
         ))}
 
@@ -145,13 +155,22 @@ export function FloorPlan() {
           radius={meetingTableRadius}
           isDark={isDark}
         />
-        <MeetingChairs seats={meetingSeats} meetingAgentCount={meetingAgents.length} isDark={isDark} />
+        <MeetingChairs
+          seats={meetingSeats}
+          meetingAgentCount={meetingAgents.length}
+          isDark={isDark}
+        />
 
         {/* ── Layer 5: Furniture – Hot desk zone ── */}
         <HotDeskZoneFurniture slots={hotDeskSlots} agents={hotDeskAgents} />
 
         {/* ── Layer 5: Furniture – Lounge zone (incl. reception + entrance) ── */}
         <LoungeDecor isDark={isDark} />
+
+        {/* ── Layer 5a: Lounge idle agents ── */}
+        {loungeAgents.map((agent) => (
+          <AgentAvatar key={`lounge-${agent.id}`} agent={agent} />
+        ))}
 
         {/* ── Layer 5b: Main entrance door on outer wall ── */}
         <EntranceDoor isDark={isDark} />
@@ -366,7 +385,12 @@ function DeskZoneFurniture({
   return (
     <g>
       {deskSlots.map((slot, i) => (
-        <DeskUnit key={`desk-${i}`} x={slot.unitX} y={slot.unitY} agent={agentBySlot.get(i) ?? null} />
+        <DeskUnit
+          key={`desk-${i}`}
+          x={slot.unitX}
+          y={slot.unitY}
+          agent={agentBySlot.get(i) ?? null}
+        />
       ))}
     </g>
   );

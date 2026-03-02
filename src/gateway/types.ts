@@ -199,11 +199,25 @@ export type ConnectionStatus =
   | "disconnected"
   | "error";
 
+// --- 配置感知 ---
+
+export interface AgentToAgentConfig {
+  enabled: boolean;
+  allow: string[];
+}
+
 // --- Store ---
 
 export type ViewMode = "2d" | "3d";
 export type ThemeMode = "light" | "dark";
-export type PageId = "office" | "dashboard" | "agents" | "channels" | "skills" | "cron" | "settings";
+export type PageId =
+  | "office"
+  | "dashboard"
+  | "agents"
+  | "channels"
+  | "skills"
+  | "cron"
+  | "settings";
 
 export interface TokenSnapshot {
   timestamp: number;
@@ -229,6 +243,10 @@ export interface OfficeStore {
   agentCosts: Record<string, number>;
   currentPage: PageId;
   chatDockHeight: number;
+
+  // 配置感知
+  maxSubAgents: number;
+  agentToAgentConfig: AgentToAgentConfig;
 
   // runId → agentId 映射
   runIdMap: Map<string, string>;
@@ -262,6 +280,10 @@ export interface OfficeStore {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
   setBloomEnabled: (enabled: boolean) => void;
+
+  // 配置感知
+  setMaxSubAgents: (n: number) => void;
+  setAgentToAgentConfig: (config: AgentToAgentConfig) => void;
 
   // Scopes & Metrics
   setOperatorScopes: (scopes: string[]) => void;

@@ -7,6 +7,7 @@ enableMapSet();
 import type {
   AgentEventPayload,
   AgentSummary,
+  AgentToAgentConfig,
   AgentVisualStatus,
   CollaborationLink,
   ConnectionStatus,
@@ -20,8 +21,9 @@ import type {
   ViewMode,
   VisualAgent,
 } from "@/gateway/types";
-import { allocatePosition } from "@/lib/position-allocator";
+import { allocatePosition, calculateLoungePositions } from "@/lib/position-allocator";
 import { applyEventToAgent } from "./agent-reducer";
+import { applyMeetingGathering, detectMeetingGroups } from "./meeting-manager";
 import { computeMetrics } from "./metrics-reducer";
 
 const EVENT_HISTORY_LIMIT = 200;
@@ -29,6 +31,17 @@ const LINK_TIMEOUT_MS = 60_000;
 const THEME_STORAGE_KEY = "openclaw-theme";
 const CHAT_DOCK_HEIGHT_KEY = "openclaw-chat-dock-height";
 const DEFAULT_CHAT_DOCK_HEIGHT = 300;
+const LOUNGE_TO_HOTDESK_DEBOUNCE_MS = 500;
+const HOTDESK_TO_LOUNGE_DELAY_MS = 30_000;
+
+const zoneMigrationTimers = new Map<string, ReturnType<typeof setTimeout>>();
+let meetingGatheringTimer: ReturnType<typeof setTimeout> | null = null;
+let lastMeetingGroupsHash = "";
+const MEETING_GATHERING_THROTTLE_MS = 500;
+
+function isActiveStatus(status: AgentVisualStatus): boolean {
+  return status === "thinking" || status === "tool_calling" || status === "speaking" || status === "spawning";
+}
 
 function getInitialChatDockHeight(): number {
   if (typeof window === "undefined") return DEFAULT_CHAT_DOCK_HEIGHT;
@@ -113,6 +126,8 @@ export const useOfficeStore = create<OfficeStore>()(
     agentCosts: {} as Record<string, number>,
     currentPage: "office" as PageId,
     chatDockHeight: getInitialChatDockHeight(),
+    maxSubAgents: 8,
+    agentToAgentConfig: { enabled: false, allow: [] } as AgentToAgentConfig,
     runIdMap: new Map(),
     sessionKeyMap: new Map(),
 
@@ -156,8 +171,24 @@ export const useOfficeStore = create<OfficeStore>()(
           occupied,
         );
         agent.parentAgentId = parentId;
-        agent.zone = "hotDesk";
         agent.runId = info.sessionKey;
+
+        // Assign to lounge zone initially; migrate to hotDesk when active
+        const loungePositions = calculateLoungePositions(state.maxSubAgents);
+        const loungeOccupied = new Set<string>();
+        for (const a of state.agents.values()) {
+          if (a.zone === "lounge") {
+            loungeOccupied.add(positionKey(a.position));
+          }
+        }
+        const freeLounge = loungePositions.find((p) => !loungeOccupied.has(positionKey(p)));
+        if (freeLounge) {
+          agent.zone = "lounge";
+          agent.position = freeLounge;
+        } else {
+          agent.zone = "hotDesk";
+        }
+
         state.agents.set(info.agentId, agent);
 
         const parent = state.agents.get(parentId);
@@ -201,7 +232,7 @@ export const useOfficeStore = create<OfficeStore>()(
         const agent = state.agents.get(agentId);
         if (agent?.originalPosition) {
           agent.position = { ...agent.originalPosition };
-          agent.zone = "desk";
+          agent.zone = agent.isSubAgent ? "hotDesk" : "desk";
           agent.originalPosition = null;
         }
       });
@@ -273,11 +304,21 @@ export const useOfficeStore = create<OfficeStore>()(
             state.sessionKeyMap.set(event.sessionKey, existing);
           }
           updateCollaborationLinks(state, event.sessionKey, agentId);
+
+          if (state.agentToAgentConfig.enabled) {
+            scheduleMeetingGathering();
+          }
         }
 
         const agent = state.agents.get(agentId);
         if (agent) {
+          const prevStatus = agent.status;
           applyEventToAgent(agent, parsed);
+
+          // Zone migration: lounge ↔ hotDesk for sub-agents
+          if (agent.isSubAgent && agent.zone !== "meeting") {
+            scheduleZoneMigration(agent.id, prevStatus, agent.status);
+          }
         }
 
         // Event history
@@ -377,6 +418,20 @@ export const useOfficeStore = create<OfficeStore>()(
       }
     },
 
+    setMaxSubAgents: (n: number) => {
+      set((state) => {
+        if (n >= 1 && n <= 50) {
+          state.maxSubAgents = n;
+        }
+      });
+    },
+
+    setAgentToAgentConfig: (config: AgentToAgentConfig) => {
+      set((state) => {
+        state.agentToAgentConfig = config;
+      });
+    },
+
     updateMetrics: () => {
       set((state) => {
         state.globalMetrics = computeMetrics(state.agents, state.globalMetrics);
@@ -425,4 +480,107 @@ function updateCollaborationLinks(
 
   // Decay stale links
   state.links = state.links.filter((l) => now - l.lastActivityAt < LINK_TIMEOUT_MS);
+}
+
+function scheduleMeetingGathering(): void {
+  if (meetingGatheringTimer) return;
+  meetingGatheringTimer = setTimeout(() => {
+    meetingGatheringTimer = null;
+    const state = useOfficeStore.getState();
+    if (!state.agentToAgentConfig.enabled) return;
+
+    const groups = detectMeetingGroups(
+      state.links,
+      state.agents,
+      state.agentToAgentConfig.allow,
+    );
+    const hash = JSON.stringify(groups.map((g) => g.agentIds.sort()));
+    if (hash === lastMeetingGroupsHash) return;
+    lastMeetingGroupsHash = hash;
+
+    applyMeetingGathering(
+      state.agents,
+      groups,
+      (id, pos) => useOfficeStore.getState().moveToMeeting(id, pos),
+      (id) => useOfficeStore.getState().returnFromMeeting(id),
+    );
+  }, MEETING_GATHERING_THROTTLE_MS);
+}
+
+function scheduleZoneMigration(
+  agentId: string,
+  prevStatus: AgentVisualStatus,
+  newStatus: AgentVisualStatus,
+): void {
+  const existingTimer = zoneMigrationTimers.get(agentId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    zoneMigrationTimers.delete(agentId);
+  }
+
+  const wasActive = isActiveStatus(prevStatus);
+  const nowActive = isActiveStatus(newStatus);
+
+  if (!wasActive && nowActive) {
+    // lounge → hotDesk with debounce
+    const timer = setTimeout(() => {
+      zoneMigrationTimers.delete(agentId);
+      migrateAgentToHotDesk(agentId);
+    }, LOUNGE_TO_HOTDESK_DEBOUNCE_MS);
+    zoneMigrationTimers.set(agentId, timer);
+  } else if (wasActive && !nowActive && newStatus === "idle") {
+    // hotDesk → lounge after sustained idle
+    const timer = setTimeout(() => {
+      zoneMigrationTimers.delete(agentId);
+      migrateAgentToLounge(agentId);
+    }, HOTDESK_TO_LOUNGE_DELAY_MS);
+    zoneMigrationTimers.set(agentId, timer);
+  }
+}
+
+function migrateAgentToHotDesk(agentId: string): void {
+  const state = useOfficeStore.getState();
+  const agent = state.agents.get(agentId);
+  if (!agent || !agent.isSubAgent || agent.zone !== "lounge") return;
+
+  const occupied = new Set<string>();
+  for (const a of state.agents.values()) {
+    if (a.zone === "hotDesk") {
+      occupied.add(positionKey(a.position));
+    }
+  }
+  const hotDeskPos = allocatePosition(agentId, true, occupied);
+
+  useOfficeStore.setState((draft) => {
+    const a = draft.agents.get(agentId);
+    if (a) {
+      a.zone = "hotDesk";
+      a.position = hotDeskPos;
+    }
+  });
+}
+
+function migrateAgentToLounge(agentId: string): void {
+  const state = useOfficeStore.getState();
+  const agent = state.agents.get(agentId);
+  if (!agent || !agent.isSubAgent || agent.zone !== "hotDesk") return;
+  if (isActiveStatus(agent.status)) return;
+
+  const loungePositions = calculateLoungePositions(state.maxSubAgents);
+  const loungeOccupied = new Set<string>();
+  for (const a of state.agents.values()) {
+    if (a.zone === "lounge") {
+      loungeOccupied.add(positionKey(a.position));
+    }
+  }
+  const freeLounge = loungePositions.find((p) => !loungeOccupied.has(positionKey(p)));
+  if (!freeLounge) return;
+
+  useOfficeStore.setState((draft) => {
+    const a = draft.agents.get(agentId);
+    if (a) {
+      a.zone = "lounge";
+      a.position = freeLounge;
+    }
+  });
 }

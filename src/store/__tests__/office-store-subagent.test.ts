@@ -20,6 +20,8 @@ function resetStore() {
     eventHistory: [],
     sidebarCollapsed: false,
     lastSessionsSnapshot: null,
+    maxSubAgents: 8,
+    agentToAgentConfig: { enabled: false, allow: [] },
     runIdMap: new Map(),
     sessionKeyMap: new Map(),
   });
@@ -51,7 +53,7 @@ describe("office-store Sub-Agent management", () => {
     expect(sub).toBeDefined();
     expect(sub?.isSubAgent).toBe(true);
     expect(sub?.parentAgentId).toBe("parent");
-    expect(sub?.zone).toBe("hotDesk");
+    expect(sub?.zone).toBe("lounge");
 
     const parent = state.agents.get("parent");
     expect(parent?.childAgentIds).toContain("sub1");
@@ -117,5 +119,64 @@ describe("office-store Sub-Agent management", () => {
     expect(agent.childAgentIds).toEqual([]);
     expect(agent.zone).toBe("desk");
     expect(agent.originalPosition).toBeNull();
+  });
+
+  it("addSubAgent assigns lounge zone and lounge position", () => {
+    const { addSubAgent } = useOfficeStore.getState();
+    addSubAgent("parent", mkSubInfo("sub-lounge-1"));
+    const sub = useOfficeStore.getState().agents.get("sub-lounge-1")!;
+    expect(sub.zone).toBe("lounge");
+    // Position should be within lounge zone bounds
+    expect(sub.position.x).toBeGreaterThan(500);
+    expect(sub.position.y).toBeGreaterThan(350);
+  });
+
+  it("returnFromMeeting returns sub-agent to hotDesk", () => {
+    const { addSubAgent, updateAgent, moveToMeeting, returnFromMeeting } = useOfficeStore.getState();
+    addSubAgent("parent", mkSubInfo("sub-meet"));
+    updateAgent("sub-meet", { zone: "hotDesk" });
+
+    moveToMeeting("sub-meet", { x: 890, y: 190 });
+    returnFromMeeting("sub-meet");
+    const restored = useOfficeStore.getState().agents.get("sub-meet")!;
+    expect(restored.zone).toBe("hotDesk");
+  });
+});
+
+describe("office-store config awareness", () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it("default maxSubAgents is 8", () => {
+    expect(useOfficeStore.getState().maxSubAgents).toBe(8);
+  });
+
+  it("setMaxSubAgents updates value within range", () => {
+    useOfficeStore.getState().setMaxSubAgents(12);
+    expect(useOfficeStore.getState().maxSubAgents).toBe(12);
+  });
+
+  it("setMaxSubAgents rejects out-of-range values", () => {
+    useOfficeStore.getState().setMaxSubAgents(0);
+    expect(useOfficeStore.getState().maxSubAgents).toBe(8);
+    useOfficeStore.getState().setMaxSubAgents(51);
+    expect(useOfficeStore.getState().maxSubAgents).toBe(8);
+  });
+
+  it("default agentToAgentConfig is disabled", () => {
+    const cfg = useOfficeStore.getState().agentToAgentConfig;
+    expect(cfg.enabled).toBe(false);
+    expect(cfg.allow).toEqual([]);
+  });
+
+  it("setAgentToAgentConfig updates config", () => {
+    useOfficeStore.getState().setAgentToAgentConfig({
+      enabled: true,
+      allow: ["main", "coder"],
+    });
+    const cfg = useOfficeStore.getState().agentToAgentConfig;
+    expect(cfg.enabled).toBe(true);
+    expect(cfg.allow).toEqual(["main", "coder"]);
   });
 });

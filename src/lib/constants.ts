@@ -80,6 +80,9 @@ export const DESK_MAX_AGENTS = DESK_GRID_COLS * DESK_GRID_ROWS;
 export const HOT_DESK_GRID_COLS = 4;
 export const HOT_DESK_GRID_ROWS = 3;
 
+export const MIN_DESK_WIDTH = 100;
+export const DEFAULT_MAX_SUB_AGENTS = 8;
+
 // 家具尺寸常量 (flat isometric 2D)
 export const FURNITURE = {
   desk: { width: 100, height: 60 },
