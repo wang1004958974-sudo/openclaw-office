@@ -665,7 +665,7 @@ export class MockAdapter implements GatewayAdapter {
     return [...MOCK_CHANNELS];
   }
 
-  async skillsStatus(): Promise<SkillInfo[]> {
+  async skillsStatus(_agentId?: string): Promise<SkillInfo[]> {
     return [...MOCK_SKILLS];
   }
 
@@ -810,11 +810,15 @@ export class MockAdapter implements GatewayAdapter {
     };
   }
 
-  async toolsCatalog(): Promise<ToolCatalog> {
+  async toolsCatalog(_agentId?: string): Promise<ToolCatalog> {
     return {
       tools: [
-        { name: "web_search", description: "搜索互联网" },
-        { name: "code_exec", description: "执行代码" },
+        { name: "web_search", description: "搜索互联网", source: "built-in", group: "core", enabled: true },
+        { name: "code_exec", description: "执行代码", source: "built-in", group: "core", enabled: true },
+        { name: "file_read", description: "读取文件内容", source: "built-in", group: "fs", enabled: true },
+        { name: "file_write", description: "写入文件", source: "built-in", group: "fs", enabled: true },
+        { name: "bash", description: "执行 Bash 命令", source: "built-in", group: "exec", enabled: true, optional: true },
+        { name: "mcp_client", description: "MCP 协议客户端", source: "plugin", group: "integrations", enabled: false, optional: true },
       ],
     };
   }

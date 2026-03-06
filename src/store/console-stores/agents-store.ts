@@ -1,7 +1,21 @@
 import { create } from "zustand";
 import { getAdapter, waitForAdapter } from "@/gateway/adapter-provider";
-import type { AgentCreateParams, AgentFileInfo, AgentModelConfig } from "@/gateway/adapter-types";
+import type {
+  AgentCreateParams,
+  AgentFileInfo,
+  AgentModelConfig,
+  ChannelInfo,
+  CronTask,
+  CronTaskInput,
+  SkillInfo,
+  ToolCatalogEntry,
+} from "@/gateway/adapter-types";
 import type { AgentSummary } from "@/gateway/types";
+import {
+  extractAgentConfig,
+  patchAgentToolsConfig,
+  patchAgentSkillsConfig,
+} from "@/lib/config-patch-helpers";
 
 export type AgentTab = "overview" | "files" | "tools" | "skills" | "channels" | "cronJobs";
 
@@ -9,6 +23,12 @@ export interface SystemModelOption {
   id: string;
   label: string;
   provider: string;
+}
+
+export interface AgentToolsConfig {
+  profile?: string;
+  alsoAllow?: string[];
+  deny?: string[];
 }
 
 interface AgentsStoreState {
@@ -34,6 +54,27 @@ interface AgentsStoreState {
   systemModels: SystemModelOption[];
   agentModelConfigs: Record<string, { primary: string; fallbacks: string[] }>;
 
+  // Tools tab
+  agentTools: ToolCatalogEntry[];
+  agentToolsLoading: boolean;
+  agentToolsConfig: AgentToolsConfig | null;
+  configHash: string | null;
+
+  // Skills tab
+  agentSkills: SkillInfo[];
+  agentSkillsLoading: boolean;
+  agentSkillsAllowlist: string[] | null;
+
+  // Channels tab
+  agentChannels: ChannelInfo[];
+  agentChannelsLoading: boolean;
+
+  // Cron tab
+  agentCronJobs: CronTask[];
+  agentCronJobsLoading: boolean;
+  cronDialogOpen: boolean;
+  cronEditingTask: CronTask | null;
+
   fetchAgents: () => Promise<void>;
   fetchSystemModels: () => Promise<void>;
   selectAgent: (id: string | null) => void;
@@ -52,7 +93,44 @@ interface AgentsStoreState {
 
   setCreateDialogOpen: (open: boolean) => void;
   setDeleteDialogOpen: (open: boolean) => void;
+
+  // Tools tab actions
+  fetchAgentTools: (agentId: string) => Promise<void>;
+  saveAgentToolsConfig: (agentId: string, toolsConfig: AgentToolsConfig) => Promise<boolean>;
+
+  // Skills tab actions
+  fetchAgentSkills: (agentId: string) => Promise<void>;
+  saveAgentSkillsAllowlist: (agentId: string, skills: string[] | null) => Promise<boolean>;
+
+  // Channels tab actions
+  fetchAgentChannels: () => Promise<void>;
+
+  // Cron tab actions
+  fetchAgentCronJobs: (agentId: string) => Promise<void>;
+  addAgentCronJob: (agentId: string, input: CronTaskInput) => Promise<void>;
+  updateAgentCronJob: (id: string, patch: Partial<CronTaskInput>) => Promise<void>;
+  removeAgentCronJob: (id: string) => Promise<void>;
+  runAgentCronJob: (id: string) => Promise<void>;
+  toggleAgentCronJob: (id: string, enabled: boolean) => Promise<void>;
+  openAgentCronDialog: (task?: CronTask) => void;
+  closeAgentCronDialog: () => void;
 }
+
+const EMPTY_TAB_STATE = {
+  agentTools: [] as ToolCatalogEntry[],
+  agentToolsLoading: false,
+  agentToolsConfig: null as AgentToolsConfig | null,
+  configHash: null as string | null,
+  agentSkills: [] as SkillInfo[],
+  agentSkillsLoading: false,
+  agentSkillsAllowlist: null as string[] | null,
+  agentChannels: [] as ChannelInfo[],
+  agentChannelsLoading: false,
+  agentCronJobs: [] as CronTask[],
+  agentCronJobsLoading: false,
+  cronDialogOpen: false,
+  cronEditingTask: null as CronTask | null,
+};
 
 export const useAgentsStore = create<AgentsStoreState>((set, get) => ({
   agents: [],
@@ -76,6 +154,8 @@ export const useAgentsStore = create<AgentsStoreState>((set, get) => ({
 
   systemModels: [],
   agentModelConfigs: {},
+
+  ...EMPTY_TAB_STATE,
 
   fetchSystemModels: async () => {
     try {
@@ -178,6 +258,7 @@ export const useAgentsStore = create<AgentsStoreState>((set, get) => ({
       fileContent: null,
       originalFileContent: null,
       isFileDirty: false,
+      ...EMPTY_TAB_STATE,
     });
   },
 
@@ -279,4 +360,162 @@ export const useAgentsStore = create<AgentsStoreState>((set, get) => ({
 
   setCreateDialogOpen: (open) => set({ createDialogOpen: open }),
   setDeleteDialogOpen: (open) => set({ deleteDialogOpen: open }),
+
+  // --- Tools tab ---
+
+  fetchAgentTools: async (agentId) => {
+    set({ agentToolsLoading: true });
+    try {
+      await waitForAdapter();
+      const adapter = getAdapter();
+      const [catalog, snap] = await Promise.all([
+        adapter.toolsCatalog(agentId),
+        adapter.configGet(),
+      ]);
+      const entry = extractAgentConfig(snap.config, agentId);
+      const tools = entry?.tools as AgentToolsConfig | undefined;
+      set({
+        agentTools: catalog.tools,
+        agentToolsConfig: tools ?? null,
+        configHash: snap.hash ?? null,
+        agentToolsLoading: false,
+      });
+    } catch {
+      set({ agentToolsLoading: false });
+    }
+  },
+
+  saveAgentToolsConfig: async (agentId, toolsConfig) => {
+    try {
+      await waitForAdapter();
+      const adapter = getAdapter();
+      const { configHash } = get();
+      const result = await patchAgentToolsConfig(
+        adapter,
+        agentId,
+        toolsConfig as Record<string, unknown>,
+        configHash ?? undefined,
+      );
+      if (result.ok) {
+        set({ agentToolsConfig: toolsConfig, configHash: result.newHash ?? null });
+      }
+      return result.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  // --- Skills tab ---
+
+  fetchAgentSkills: async (agentId) => {
+    set({ agentSkillsLoading: true });
+    try {
+      await waitForAdapter();
+      const adapter = getAdapter();
+      const [skills, snap] = await Promise.all([
+        adapter.skillsStatus(agentId),
+        adapter.configGet(),
+      ]);
+      const entry = extractAgentConfig(snap.config, agentId);
+      const allowlist = entry?.skills ?? null;
+      set({
+        agentSkills: skills,
+        agentSkillsAllowlist: allowlist,
+        configHash: snap.hash ?? null,
+        agentSkillsLoading: false,
+      });
+    } catch {
+      set({ agentSkillsLoading: false });
+    }
+  },
+
+  saveAgentSkillsAllowlist: async (agentId, skills) => {
+    try {
+      await waitForAdapter();
+      const adapter = getAdapter();
+      const { configHash } = get();
+      const result = await patchAgentSkillsConfig(
+        adapter,
+        agentId,
+        skills,
+        configHash ?? undefined,
+      );
+      if (result.ok) {
+        set({ agentSkillsAllowlist: skills, configHash: result.newHash ?? null });
+      }
+      return result.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  // --- Channels tab ---
+
+  fetchAgentChannels: async () => {
+    set({ agentChannelsLoading: true });
+    try {
+      await waitForAdapter();
+      const channels = await getAdapter().channelsStatus();
+      set({ agentChannels: channels, agentChannelsLoading: false });
+    } catch {
+      set({ agentChannelsLoading: false });
+    }
+  },
+
+  // --- Cron tab ---
+
+  fetchAgentCronJobs: async (agentId) => {
+    set({ agentCronJobsLoading: true });
+    try {
+      await waitForAdapter();
+      const all = await getAdapter().cronList();
+      set({
+        agentCronJobs: all.filter((j) => j.agentId === agentId),
+        agentCronJobsLoading: false,
+      });
+    } catch {
+      set({ agentCronJobsLoading: false });
+    }
+  },
+
+  addAgentCronJob: async (agentId, input) => {
+    await waitForAdapter();
+    const task = await getAdapter().cronAdd({ ...input, agentId });
+    set((s) => ({ agentCronJobs: [...s.agentCronJobs, task] }));
+  },
+
+  updateAgentCronJob: async (id, patch) => {
+    await waitForAdapter();
+    const updated = await getAdapter().cronUpdate(id, patch);
+    set((s) => ({
+      agentCronJobs: s.agentCronJobs.map((j) => (j.id === id ? updated : j)),
+    }));
+  },
+
+  removeAgentCronJob: async (id) => {
+    await waitForAdapter();
+    await getAdapter().cronRemove(id);
+    set((s) => ({ agentCronJobs: s.agentCronJobs.filter((j) => j.id !== id) }));
+  },
+
+  runAgentCronJob: async (id) => {
+    await waitForAdapter();
+    await getAdapter().cronRun(id);
+  },
+
+  toggleAgentCronJob: async (id, enabled) => {
+    await waitForAdapter();
+    const updated = await getAdapter().cronUpdate(id, { enabled });
+    set((s) => ({
+      agentCronJobs: s.agentCronJobs.map((j) => (j.id === id ? updated : j)),
+    }));
+  },
+
+  openAgentCronDialog: (task) => {
+    set({ cronDialogOpen: true, cronEditingTask: task ?? null });
+  },
+
+  closeAgentCronDialog: () => {
+    set({ cronDialogOpen: false, cronEditingTask: null });
+  },
 }));

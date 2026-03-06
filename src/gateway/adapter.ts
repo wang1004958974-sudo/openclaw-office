@@ -60,7 +60,7 @@ export interface GatewayAdapter {
   webLoginWait(): Promise<{ connected: boolean; message: string }>;
 
   // Skills
-  skillsStatus(): Promise<SkillInfo[]>;
+  skillsStatus(agentId?: string): Promise<SkillInfo[]>;
   skillsInstall(name: string, installId: string): Promise<SkillInstallResult>;
   skillsUpdate(skillKey: string, patch: SkillUpdatePatch): Promise<{ ok: boolean }>;
 
@@ -79,7 +79,7 @@ export interface GatewayAdapter {
   agentsFilesList(agentId: string): Promise<AgentFilesListResult>;
   agentsFilesGet(agentId: string, name: string): Promise<AgentFileContent>;
   agentsFilesSet(agentId: string, name: string, content: string): Promise<AgentFileSetResult>;
-  toolsCatalog(): Promise<ToolCatalog>;
+  toolsCatalog(agentId?: string): Promise<ToolCatalog>;
   usageStatus(): Promise<UsageInfo>;
 
   // Models catalog (from pi-ai SDK auto-discovery)

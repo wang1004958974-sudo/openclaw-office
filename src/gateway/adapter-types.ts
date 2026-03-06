@@ -174,6 +174,10 @@ export interface ToolCatalogEntry {
   name: string;
   description: string;
   schema?: Record<string, unknown>;
+  source?: string;
+  group?: string;
+  optional?: boolean;
+  enabled?: boolean;
 }
 
 export interface ToolCatalog {

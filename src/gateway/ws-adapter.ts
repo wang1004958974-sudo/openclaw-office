@@ -125,8 +125,12 @@ export class WsAdapter implements GatewayAdapter {
     return this.rpcClient.request<{ connected: boolean; message: string }>("web.login.wait");
   }
 
-  async skillsStatus(): Promise<SkillInfo[]> {
-    const result = await this.rpcClient.request<GatewaySkillsStatusResult>("skills.status");
+  async skillsStatus(agentId?: string): Promise<SkillInfo[]> {
+    const params = agentId ? { agentId } : undefined;
+    const result = await this.rpcClient.request<GatewaySkillsStatusResult>(
+      "skills.status",
+      params,
+    );
     return mapSkillEntries(result.skills ?? []);
   }
 
@@ -207,8 +211,9 @@ export class WsAdapter implements GatewayAdapter {
     });
   }
 
-  async toolsCatalog(): Promise<ToolCatalog> {
-    return this.rpcClient.request<ToolCatalog>("tools.catalog");
+  async toolsCatalog(agentId?: string): Promise<ToolCatalog> {
+    const params = agentId ? { agentId } : undefined;
+    return this.rpcClient.request<ToolCatalog>("tools.catalog", params);
   }
 
   async usageStatus(): Promise<UsageInfo> {
