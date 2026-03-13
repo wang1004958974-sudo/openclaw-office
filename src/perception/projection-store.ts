@@ -106,8 +106,20 @@ export const useProjectionStore = create<ProjectionStoreState>()(
         const newState = KIND_TO_STATE[event.kind] ?? "IDLE";
 
         for (const actorId of event.actors) {
-          const agent = state.agents.get(actorId);
-          if (!agent) continue;
+          let agent = state.agents.get(actorId);
+          if (!agent) {
+            // Auto-create agent on first event (supports real Gateway agents)
+            agent = {
+              agentId: actorId,
+              role: actorId,
+              state: "IDLE",
+              deskId: actorId,
+              load: 0,
+              lastHeartbeatAt: Date.now(),
+              health: "ok",
+            };
+            state.agents.set(actorId, agent);
+          }
 
           agent.state = newState;
 

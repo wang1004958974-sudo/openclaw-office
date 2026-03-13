@@ -121,6 +121,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
 
       if (status === "connected") {
         initAgentsFromSnapshot(ws, initAgents);
+        initProjectionFromSnapshot(ws);
         const snapshot = ws.getSnapshot();
         const scopes = (snapshot as Record<string, unknown>)?.scopes;
         setOperatorScopes(Array.isArray(scopes) ? (scopes as string[]) : ["operator"]);
@@ -181,6 +182,19 @@ function initAgentsFromSnapshot(
   const health = snapshot?.health as HealthSnapshot | undefined;
   if (health?.agents) {
     initAgents(healthAgentsToSummaries(health));
+  }
+}
+
+function initProjectionFromSnapshot(ws: GatewayWsClient): void {
+  const snapshot = ws.getSnapshot();
+  const health = snapshot?.health as HealthSnapshot | undefined;
+  if (health?.agents) {
+    const batch = health.agents.map((a) => ({
+      agentId: a.agentId,
+      role: a.agentId,
+      deskId: a.agentId,
+    }));
+    useProjectionStore.getState().initAgentsBatch(batch);
   }
 }
 

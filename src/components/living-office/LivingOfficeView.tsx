@@ -1,8 +1,11 @@
+import { useMemo } from "react";
 import { useProjectionStore } from "@/perception/projection-store";
+import type { AgentProjection } from "@/perception/types";
 import { AgentCharacter2D5 } from "./characters/AgentCharacter2D5";
 import { SUB_AGENT_SLOTS } from "./characters/constants";
 import { SubAgentGhost, allocateSubAgentSlots } from "./characters/SubAgentGhost";
 import { DESK_CONFIGS } from "./config";
+import type { DeskConfig } from "./types";
 import { OfficeStage } from "./scene/OfficeStage";
 import { Desk } from "./workspace/Desk";
 import { CronZone } from "./zones/CronZone";
@@ -12,8 +15,55 @@ import { OpsZone } from "./zones/OpsZone";
 import { ProjectZone } from "./zones/ProjectZone";
 import { StaffZone } from "./zones/StaffZone";
 
+function agentStateToDeskStatus(state: string): "idle" | "busy" | "blocked" | "heartbeat" {
+  switch (state) {
+    case "WORKING":
+    case "TOOL_CALL":
+    case "COLLABORATING":
+    case "INCOMING":
+    case "ACK":
+      return "busy";
+    case "BLOCKED":
+      return "blocked";
+    default:
+      return "idle";
+  }
+}
+
+interface DeskAssignment {
+  desk: DeskConfig;
+  agent: AgentProjection | undefined;
+}
+
+/**
+ * Dynamically assign real agents to desk slots.
+ * First N agents (up to DESK_CONFIGS.length) get a desk.
+ * Desks also get real names + status from agent data.
+ */
+function assignAgentsToDesks(agents: Map<string, AgentProjection>): DeskAssignment[] {
+  const agentList = Array.from(agents.values());
+
+  return DESK_CONFIGS.map((desk, i) => {
+    const agent = agentList[i];
+    if (agent) {
+      return {
+        desk: {
+          ...desk,
+          agentName: agent.agentId,
+          role: agent.role,
+          status: agentStateToDeskStatus(agent.state),
+        },
+        agent,
+      };
+    }
+    return { desk, agent: undefined };
+  });
+}
+
 export function LivingOfficeView() {
   const agents = useProjectionStore((s) => s.agents);
+
+  const assignments = useMemo(() => assignAgentsToDesks(agents), [agents]);
 
   const subAgentEntries = Array.from(agents.values()).filter(
     (a) => a.state === "COLLABORATING",
@@ -62,23 +112,25 @@ export function LivingOfficeView() {
         <MemoryZone />
 
         {/* Desks */}
-        {DESK_CONFIGS.map((desk) => (
-          <Desk key={desk.id} config={desk} />
+        {assignments.map(({ desk, agent }) => (
+          <Desk
+            key={desk.id}
+            config={desk}
+            status={agent ? agentStateToDeskStatus(agent.state) : "idle"}
+            bubble={agent?.taskSummary ?? ""}
+          />
         ))}
 
-        {/* Agent Characters */}
-        {DESK_CONFIGS.map((desk) => {
-          const agent = agents.get(desk.id);
-          return (
-            <AgentCharacter2D5
-              key={`char-${desk.id}`}
-              agentId={desk.id}
-              deskId={desk.id}
-              name={desk.agentName}
-              perceivedState={agent?.state ?? "IDLE"}
-            />
-          );
-        })}
+        {/* Agent Characters (positioned independently above desks) */}
+        {assignments.map(({ desk, agent }) => (
+          <AgentCharacter2D5
+            key={`char-${desk.id}`}
+            agentId={agent?.agentId ?? desk.id}
+            deskId={desk.id}
+            name={agent?.agentId ?? desk.agentName}
+            perceivedState={agent?.state ?? "IDLE"}
+          />
+        ))}
 
         {/* Sub-agent ghosts in Project Room */}
         {subAgentSlots.map((slot) => {
