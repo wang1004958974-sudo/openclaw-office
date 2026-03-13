@@ -1,3 +1,7 @@
+import { useProjectionStore } from "@/perception/projection-store";
+import { AgentCharacter2D5 } from "./characters/AgentCharacter2D5";
+import { SUB_AGENT_SLOTS } from "./characters/constants";
+import { SubAgentGhost, allocateSubAgentSlots } from "./characters/SubAgentGhost";
 import { DESK_CONFIGS } from "./config";
 import { OfficeStage } from "./scene/OfficeStage";
 import { Desk } from "./workspace/Desk";
@@ -9,6 +13,15 @@ import { ProjectZone } from "./zones/ProjectZone";
 import { StaffZone } from "./zones/StaffZone";
 
 export function LivingOfficeView() {
+  const agents = useProjectionStore((s) => s.agents);
+
+  const subAgentEntries = Array.from(agents.values()).filter(
+    (a) => a.state === "COLLABORATING",
+  );
+  const subAgentSlots = allocateSubAgentSlots(
+    subAgentEntries.map((a) => ({ agentId: a.agentId, name: a.role })),
+  );
+
   return (
     <div
       className="living-office"
@@ -52,6 +65,35 @@ export function LivingOfficeView() {
         {DESK_CONFIGS.map((desk) => (
           <Desk key={desk.id} config={desk} />
         ))}
+
+        {/* Agent Characters */}
+        {DESK_CONFIGS.map((desk) => {
+          const agent = agents.get(desk.id);
+          return (
+            <AgentCharacter2D5
+              key={`char-${desk.id}`}
+              agentId={desk.id}
+              deskId={desk.id}
+              name={desk.agentName}
+              perceivedState={agent?.state ?? "IDLE"}
+            />
+          );
+        })}
+
+        {/* Sub-agent ghosts in Project Room */}
+        {subAgentSlots.map((slot) => {
+          const pos = SUB_AGENT_SLOTS[slot.slotIndex];
+          if (!pos) return null;
+          return (
+            <SubAgentGhost
+              key={`sub-${slot.agentId}`}
+              agentId={slot.agentId}
+              name={slot.name}
+              position={pos}
+              active
+            />
+          );
+        })}
       </OfficeStage>
     </div>
   );

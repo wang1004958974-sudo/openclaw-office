@@ -121,12 +121,210 @@
   top: 50%;
   width: 1380px;
   height: 820px;
-  transform: translate(-50%, -50%) scale(1.08) rotateX(58deg) rotateZ(-28deg);
+  transform: translate(-50%, -50%) scale(1.08) rotateX(50deg) rotateZ(-18deg);
   transform-style: preserve-3d;
 }
 
 @media (max-width: 1400px) {
   .lo-office {
-    transform: translate(-50%, -50%) scale(0.88) rotateX(58deg) rotateZ(-28deg);
+    transform: translate(-50%, -50%) scale(0.88) rotateX(50deg) rotateZ(-18deg);
   }
+}
+
+/* === Agent Character 2.5D Animations === */
+
+/* IDLE: breathing — subtle scale oscillation */
+@keyframes lo-char-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+.lo-char-state-idle .lo-char-body {
+  animation: lo-char-breathe 3.5s ease-in-out infinite;
+}
+
+/* INCOMING: brightness lift */
+.lo-char-state-incoming .lo-char-body {
+  filter: brightness(1.1);
+  transition: filter 0.3s ease;
+}
+
+/* ACK: nod — micro translateY bounce */
+@keyframes lo-char-nod {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(3px);
+  }
+}
+
+.lo-char-state-ack .lo-char-head {
+  animation: lo-char-nod 0.6s ease-out;
+}
+
+/* WORKING: steady brightness + enhanced glow */
+.lo-char-state-working .lo-char-body {
+  filter: brightness(1.05);
+}
+
+.lo-char-state-working .lo-char-torso {
+  box-shadow:
+    0 0 18px rgba(92, 200, 255, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* TOOL_CALL: opacity flash on working base */
+@keyframes lo-char-tool-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.lo-char-state-tool-call .lo-char-body {
+  filter: brightness(1.05);
+}
+
+.lo-char-state-tool-call .lo-char-torso {
+  animation: lo-char-tool-flash 0.8s ease-in-out infinite;
+}
+
+/* WAITING: slow blink */
+@keyframes lo-char-wait-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.lo-char-state-waiting .lo-char-body {
+  animation: lo-char-wait-blink 2.5s ease-in-out infinite;
+}
+
+/* BLOCKED: red overlay */
+.lo-char-state-blocked .lo-char-torso {
+  background: linear-gradient(180deg, #ff8888, #cc4444) !important;
+  box-shadow:
+    0 0 18px rgba(255, 100, 120, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.lo-char-state-blocked .lo-char-body {
+  filter: brightness(0.95);
+}
+
+/* DONE: short brightness burst */
+@keyframes lo-char-done-flash {
+  0% {
+    filter: brightness(1.25);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.lo-char-state-done .lo-char-body {
+  animation: lo-char-done-flash 0.8s ease-out forwards;
+}
+
+/* RECOVERED: red → yellow → green color sweep */
+@keyframes lo-char-recover-sweep {
+  0% {
+    background: linear-gradient(180deg, #ff8888, #cc4444);
+    box-shadow:
+      0 0 14px rgba(255, 100, 120, 0.35),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    background: linear-gradient(180deg, #ffd866, #e8a820);
+    box-shadow:
+      0 0 14px rgba(247, 185, 85, 0.35),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    background: linear-gradient(180deg, #7dd5ff, #5c8dff);
+    box-shadow:
+      0 0 12px rgba(92, 200, 255, 0.25),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.lo-char-state-recovered .lo-char-torso {
+  animation: lo-char-recover-sweep 2s ease-out forwards;
+}
+
+/* WALKING: bob bounce during movement */
+@keyframes lo-char-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.lo-char-walking .lo-char-body {
+  filter: brightness(1.1);
+}
+
+.lo-char-walking .lo-char-torso {
+  animation: lo-char-bob 0.5s ease-in-out infinite;
+}
+
+/* COLLABORATING: glow intensify */
+.lo-char-state-collaborating .lo-char-torso {
+  box-shadow:
+    0 0 24px rgba(143, 125, 255, 0.4),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Sub-agent ghost: lower opacity, scale transitions */
+.lo-subagent-ghost {
+  opacity: 0;
+  transform: scale(0.8) translateZ(18px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+.lo-subagent-ghost.lo-subagent-visible {
+  opacity: 0.7;
+  transform: scale(1) translateZ(18px);
+}
+
+/* Path line glow */
+.lo-path-line {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(92, 200, 255, 0.7) 30%,
+    rgba(92, 200, 255, 0.9) 50%,
+    rgba(92, 200, 255, 0.7) 70%,
+    transparent
+  );
+  box-shadow: 0 0 16px rgba(92, 200, 255, 0.45);
+  transform-origin: left center;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.lo-path-line.lo-path-fading {
+  opacity: 0;
 }
