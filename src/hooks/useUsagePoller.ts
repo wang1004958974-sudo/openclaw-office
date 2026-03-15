@@ -6,9 +6,14 @@ import { useOfficeStore } from "@/store/office-store";
 const POLL_INTERVAL_MS = 60_000;
 const FAILURE_THRESHOLD = 3;
 
-interface UsageStatusResponse {
-  total?: number;
-  byAgent?: Record<string, number>;
+interface SessionTokenRow {
+  key?: string;
+  totalTokens?: number;
+  totalTokensFresh?: boolean;
+}
+
+interface SessionsListResponse {
+  sessions?: SessionTokenRow[];
 }
 
 interface UsageCostResponse {
@@ -40,25 +45,18 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
       }
 
       try {
-        const [statusResp, costResp] = await Promise.all([
-          rpc.request<UsageStatusResponse>("usage.status"),
+        const [sessionsResp, costResp] = await Promise.all([
+          rpc.request<SessionsListResponse>("sessions.list"),
           rpc.request<UsageCostResponse>("usage.cost").catch(() => null),
         ]);
 
         failureCountRef.current = 0;
 
-        const now = Date.now();
-        const total =
-          typeof statusResp?.total === "number"
-            ? statusResp.total
-            : sumValues(statusResp?.byAgent ?? {});
-        const byAgent = statusResp?.byAgent ?? {};
+        const snapshot = buildSnapshotFromSessions(sessionsResp?.sessions ?? []);
 
-        pushTokenSnapshot({
-          timestamp: now,
-          total,
-          byAgent,
-        });
+        if (snapshot) {
+          pushTokenSnapshot(snapshot);
+        }
 
         const costs = costResp?.byAgent ?? costResp?.costs ?? {};
         if (Object.keys(costs).length > 0) {
@@ -89,14 +87,39 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
   }, [connectionStatus, pushTokenSnapshot, setAgentCosts]);
 }
 
-function sumValues(obj: Record<string, number>): number {
-  let sum = 0;
-  for (const v of Object.values(obj)) {
-    if (typeof v === "number") {
-      sum += v;
+export function buildSnapshotFromSessions(sessions: SessionTokenRow[]): TokenSnapshot | null {
+  const byAgent: Record<string, number> = {};
+  let total = 0;
+
+  for (const session of sessions) {
+    if (session.totalTokensFresh === false) {
+      continue;
     }
+    if (typeof session.totalTokens !== "number" || !Number.isFinite(session.totalTokens)) {
+      continue;
+    }
+    const agentId = extractAgentIdFromSessionKey(session.key);
+    if (!agentId) {
+      continue;
+    }
+    byAgent[agentId] = (byAgent[agentId] ?? 0) + session.totalTokens;
+    total += session.totalTokens;
   }
-  return sum;
+
+  if (total === 0) {
+    return null;
+  }
+
+  return {
+    timestamp: Date.now(),
+    total,
+    byAgent,
+  };
+}
+
+function extractAgentIdFromSessionKey(sessionKey: string | undefined): string | null {
+  const match = /^agent:([^:]+):/.exec(sessionKey ?? "");
+  return match?.[1] ?? null;
 }
 
 function estimateFromEventHistory(

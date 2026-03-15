@@ -1,19 +1,39 @@
 import { useEffect, useState } from "react";
-import type { BusLine } from "../types";
-
-const BUS_LINES: BusLine[] = [
-  { title: "Provider Mesh", detail: "channel / client / node" },
-  { title: "Event Spine", detail: "agent / heartbeat / cron / health" },
-  { title: "Dispatch Queue", detail: "perception paced routing" },
-];
+import { useProjectionStore } from "@/perception/projection-store";
+import { useOfficeStore } from "@/store/office-store";
 
 export function GatewayCore() {
   const [clock, setClock] = useState(() => formatTime());
+  const connectionStatus = useOfficeStore((s) => s.connectionStatus);
+  const operatorScopes = useOfficeStore((s) => s.operatorScopes);
+  const globalMetrics = useOfficeStore((s) => s.globalMetrics);
+  const gatewayStream = useProjectionStore((s) => s.sceneArea.gatewayStream);
 
   useEffect(() => {
     const id = setInterval(() => setClock(formatTime()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const busLines = [
+    {
+      title: "WebSocket",
+      detail:
+        gatewayStream.find((line) => line.label === "WebSocket")?.detail ??
+        connectionStatus,
+    },
+    {
+      title: "Event Spine",
+      detail:
+        gatewayStream.find((line) => line.label === "Event Bus")?.detail ??
+        `active ${globalMetrics.activeAgents}/${globalMetrics.totalAgents}`,
+    },
+    {
+      title: "RPC / Scope",
+      detail:
+        gatewayStream.find((line) => line.label === "RPC")?.detail ??
+        (operatorScopes[0] ?? "operator"),
+    },
+  ];
 
   return (
     <div
@@ -71,7 +91,7 @@ export function GatewayCore() {
           gap: 10,
         }}
       >
-        {BUS_LINES.map((bus) => (
+        {busLines.map((bus) => (
           <div
             key={bus.title}
             style={{

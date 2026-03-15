@@ -153,17 +153,20 @@ EOF
 openclaw config get gateway.auth.token
 ```
 
-### 3. 启用 Device Auth Bypass（必须）
+### 3. 浏览器 Device Identity
 
-OpenClaw Office 是纯 Web 应用，无法提供 Gateway 2026.2.15+ 要求的 Ed25519 device identity 签名。需要配置 Gateway 绕过此要求：
+OpenClaw Office 现在会像 OpenClaw 内置 Control UI 一样，在浏览器侧完成 device identity 签名。以下常见场景通常**不再需要** `gateway.controlUi.dangerouslyDisableDeviceAuth`：
+
+- 在 `http://localhost:*` 或 `http://127.0.0.1:*` 打开 OpenClaw Office
+- 通过 HTTPS 访问 OpenClaw Office
+
+如果你是从远程机器通过纯 HTTP 访问，浏览器可能拿不到 `crypto.subtle`，Gateway 仍可能拒绝连接。此时应优先改用 HTTPS；只有在临时调试且确认风险的情况下，才建议使用危险 bypass：
 
 ```bash
 openclaw config set gateway.controlUi.dangerouslyDisableDeviceAuth true
 ```
 
-配置后需**重启 Gateway**。
-
-> **安全提示：** 此 bypass 配置仅建议在本地开发环境使用。生产环境应通过反向代理或其他安全机制处理认证。
+如果修改了 Gateway 认证策略，之后需要**重启 Gateway**。
 
 ### 4. 启动 Gateway
 
@@ -186,6 +189,7 @@ pnpm dev
 | 变量                 | 必须                      | 默认值                 | 说明                             |
 | -------------------- | ------------------------- | ---------------------- | -------------------------------- |
 | `VITE_GATEWAY_URL`   | 否                        | `ws://localhost:18789` | Gateway WebSocket 地址           |
+| `VITE_GATEWAY_WS_PATH` | 否                      | `/gateway-ws`          | 浏览器侧反向代理 WS 路径        |
 | `VITE_GATEWAY_TOKEN` | 是（连接真实 Gateway 时） | —                      | Gateway 认证 token               |
 | `VITE_MOCK`          | 否                        | `false`                | 启用 Mock 模式（不需要 Gateway） |
 

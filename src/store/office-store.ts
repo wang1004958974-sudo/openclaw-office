@@ -906,10 +906,16 @@ export const useOfficeStore = create<OfficeStore>()(
 
     pushTokenSnapshot: (snapshot: TokenSnapshot) => {
       set((state) => {
+        const previous = state.tokenHistory[state.tokenHistory.length - 1];
         state.tokenHistory.push(snapshot);
         if (state.tokenHistory.length > 30) {
           state.tokenHistory = state.tokenHistory.slice(-30);
         }
+        const elapsedMinutes = previous ? (snapshot.timestamp - previous.timestamp) / 60_000 : 0;
+        const tokenRate =
+          elapsedMinutes > 0 ? Math.max(0, (snapshot.total - previous.total) / elapsedMinutes) : 0;
+        state.globalMetrics.totalTokens = snapshot.total;
+        state.globalMetrics.tokenRate = Number.isFinite(tokenRate) ? tokenRate : 0;
       });
     },
 

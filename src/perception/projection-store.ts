@@ -49,6 +49,8 @@ interface ProjectionStoreState {
   };
 }
 
+const SCENE_AREA_LIMIT = 5;
+
 function createDefaultSceneArea(): SceneAreaState {
   return {
     gatewayStream: [
@@ -62,6 +64,121 @@ function createDefaultSceneArea(): SceneAreaState {
     projectTasks: [],
     opsRules: [],
   };
+}
+
+function pushUniqueLimited<T>(
+  list: T[],
+  item: T,
+  isSame: (left: T, right: T) => boolean,
+  limit = SCENE_AREA_LIMIT,
+): void {
+  const existingIndex = list.findIndex((entry) => isSame(entry, item));
+  if (existingIndex >= 0) {
+    list.splice(existingIndex, 1);
+  }
+  list.push(item);
+  if (list.length > limit) {
+    list.splice(0, list.length - limit);
+  }
+}
+
+function summarizeActors(event: PerceivedEvent): string {
+  if (event.actors.length === 0) {
+    return "system";
+  }
+  if (event.actors.length === 1) {
+    return event.actors[0];
+  }
+  return `${event.actors[0]} +${event.actors.length - 1}`;
+}
+
+function deriveMemoryTag(event: PerceivedEvent): string {
+  switch (event.kind) {
+    case "BROADCAST_CRON":
+      return "cron";
+    case "BLOCK":
+      return "incident";
+    case "RECOVER":
+      return "recovery";
+    case "CALL_TOOL":
+      return "tool";
+    case "SPAWN_SUBAGENT":
+      return "project";
+    default:
+      return event.area;
+  }
+}
+
+function syncSceneAreaFromEvent(sceneArea: SceneAreaState, event: PerceivedEvent): void {
+  if (event.summary && event.kind !== "POLL_HEARTBEAT") {
+    pushUniqueLimited(
+      sceneArea.memoryItems,
+      { text: event.summary, tag: deriveMemoryTag(event) },
+      (left, right) => left.text === right.text,
+    );
+  }
+
+  if (event.kind === "SPAWN_SUBAGENT" || event.kind === "COLLAB") {
+    pushUniqueLimited(
+      sceneArea.projectTasks,
+      {
+        title: event.summary,
+        subtitle: `active · ${summarizeActors(event)}`,
+      },
+      (left, right) => left.title === right.title,
+    );
+  }
+
+  if (event.kind === "BLOCK" || event.kind === "RECOVER") {
+    pushUniqueLimited(
+      sceneArea.opsRules,
+      {
+        text: event.summary,
+        tag: event.kind === "BLOCK" ? "incident" : "recovery",
+      },
+      (left, right) => left.text === right.text,
+    );
+  }
+
+  if (event.kind === "BROADCAST_CRON") {
+    pushUniqueLimited(
+      sceneArea.cronTasks,
+      {
+        time: new Date(event.startTs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+        name: event.summary,
+        status: "running",
+      },
+      (left, right) => left.name === right.name && left.time === right.time,
+    );
+  }
+
+  if (event.kind === "ARRIVE" || event.kind === "DISPATCH") {
+    const webSocketLine = sceneArea.gatewayStream.find((line) => line.label === "WebSocket");
+    if (webSocketLine) {
+      webSocketLine.detail = "实时事件中";
+      webSocketLine.active = true;
+    }
+
+    const streamLine = sceneArea.gatewayStream.find((line) => line.label === "Event Bus");
+    if (streamLine) {
+      streamLine.detail = event.summary.slice(0, 30);
+      streamLine.active = true;
+    }
+
+    const rpcLine = sceneArea.gatewayStream.find((line) => line.label === "RPC");
+    if (rpcLine) {
+      rpcLine.detail = `actors ${event.actors.length || 1}`;
+      rpcLine.active = true;
+    }
+  }
+
+  if (event.kind === "BLOCK" || event.kind === "RECOVER") {
+    const healthLine = sceneArea.gatewayStream.find((line) => line.label === "Health");
+    if (healthLine) {
+      healthLine.detail = event.kind === "BLOCK" ? "异常告警" : "恢复正常";
+      healthLine.active = event.kind !== "BLOCK";
+    }
+  }
 }
 
 export const useProjectionStore = create<ProjectionStoreState>()(
@@ -151,25 +268,7 @@ export const useProjectionStore = create<ProjectionStoreState>()(
           }
         }
 
-        // 更新场景区域
-        if (event.kind === "BROADCAST_CRON") {
-          state.sceneArea.cronTasks.push({
-            time: new Date(event.startTs).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-            name: event.summary,
-            status: "running",
-          });
-          if (state.sceneArea.cronTasks.length > 5) {
-            state.sceneArea.cronTasks.shift();
-          }
-        }
-
-        if (event.kind === "ARRIVE" || event.kind === "DISPATCH") {
-          const streamLine = state.sceneArea.gatewayStream.find((l) => l.label === "Event Bus");
-          if (streamLine) {
-            streamLine.detail = event.summary.slice(0, 30);
-            streamLine.active = true;
-          }
-        }
+        syncSceneAreaFromEvent(state.sceneArea, event);
       });
     },
 

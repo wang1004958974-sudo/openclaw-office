@@ -1,9 +1,15 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf-8"));
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf-8"));
+const rawGatewayUrl = process.env.OPENCLAW_GATEWAY_URL || process.env.VITE_GATEWAY_URL || "ws://localhost:18789";
+const gatewayUrl = new URL(rawGatewayUrl);
+const gatewayTarget = `${gatewayUrl.protocol === "wss:" ? "https:" : gatewayUrl.protocol === "ws:" ? "http:" : gatewayUrl.protocol}//${gatewayUrl.host}`;
+const gatewayPath = `${gatewayUrl.pathname}${gatewayUrl.search}` || "/";
 export default defineConfig({
     define: {
         __APP_VERSION__: JSON.stringify(pkg.version),
@@ -11,16 +17,23 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     resolve: {
         alias: {
-            "@": resolve(__dirname, "./src"),
+            "@": resolve(rootDir, "./src"),
         },
     },
     server: {
         port: 5180,
         proxy: {
             "/gateway-ws": {
-                target: "ws://localhost:18789",
+                target: gatewayTarget,
                 ws: true,
-                rewrite: (path) => path.replace(/^\/gateway-ws/, ""),
+                changeOrigin: true,
+                rewrite: () => gatewayPath,
+            },
+            "/api/gateway/ws": {
+                target: gatewayTarget,
+                ws: true,
+                changeOrigin: true,
+                rewrite: () => gatewayPath,
             },
         },
     },

@@ -1,3 +1,6 @@
+import { useMemo } from "react";
+import { useProjectionStore } from "@/perception/projection-store";
+import { useOfficeStore } from "@/store/office-store";
 import { GlassPanel } from "./GlassPanel";
 import { PanelHead } from "./PanelHead";
 
@@ -8,6 +11,21 @@ interface ProjectRoomProps {
 const DEFAULT_TASKS = [{ title: "暂无临时协作", subtitle: "temporary workforce zone" }];
 
 export function ProjectRoom({ tasks = DEFAULT_TASKS }: ProjectRoomProps) {
+  const lastSessionsSnapshot = useOfficeStore((s) => s.lastSessionsSnapshot);
+  const projectedTasks = useProjectionStore((s) => s.sceneArea.projectTasks);
+  const sessions = lastSessionsSnapshot?.sessions;
+  const liveTasks =
+    sessions && sessions.length > 0
+      ? sessions.map((session) => ({
+          title: session.label || session.agentId,
+          subtitle: session.task || session.requesterSessionKey,
+        }))
+      : projectedTasks;
+  const displayTasks = useMemo(
+    () => (liveTasks.length > 0 ? liveTasks : tasks),
+    [liveTasks, tasks],
+  );
+
   return (
     <GlassPanel
       style={{
@@ -28,7 +46,7 @@ export function ProjectRoom({ tasks = DEFAULT_TASKS }: ProjectRoomProps) {
           padding: "0 14px 14px",
         }}
       >
-        {tasks.map((task) => (
+        {displayTasks.slice(0, 3).map((task) => (
           <div
             key={task.title}
             style={{

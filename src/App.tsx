@@ -157,6 +157,23 @@ const PAGE_MAP: Record<string, PageId> = {
   "/settings": "settings",
 };
 
+function resolveGatewayWsUrl(pathOrUrl: string, fallbackUrl: string): string {
+  const value = (pathOrUrl || "").trim();
+  if (value.startsWith("ws://") || value.startsWith("wss://")) {
+    return value;
+  }
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    const url = new URL(value);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    return url.toString();
+  }
+  if (value.startsWith("/")) {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}${value}`;
+  }
+  return fallbackUrl;
+}
+
 function PageTracker() {
   const location = useLocation();
   const setCurrentPage = useOfficeStore((s) => s.setCurrentPage);
@@ -171,10 +188,13 @@ function PageTracker() {
 
 export function App() {
   const injected = (window as unknown as Record<string, unknown>).__OPENCLAW_CONFIG__ as
-    | { gatewayUrl?: string; gatewayToken?: string }
+    | { gatewayUrl?: string; gatewayToken?: string; gatewayWsPath?: string }
     | undefined;
-  const gatewayUrl =
-    injected?.gatewayUrl || import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18789";
+  const configuredGatewayUrl = injected?.gatewayUrl || import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18789";
+  const gatewayUrl = resolveGatewayWsUrl(
+    injected?.gatewayWsPath || import.meta.env.VITE_GATEWAY_WS_PATH || "/gateway-ws",
+    configuredGatewayUrl,
+  );
   const gatewayToken = injected?.gatewayToken || import.meta.env.VITE_GATEWAY_TOKEN || "";
   const { isMobile } = useResponsive();
   const setViewMode = useOfficeStore((s) => s.setViewMode);

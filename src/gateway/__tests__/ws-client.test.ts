@@ -71,6 +71,11 @@ describe("GatewayWsClient", () => {
     globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     MockWebSocket.reset();
     client = new GatewayWsClient();
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: false,
+    });
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -99,6 +104,30 @@ describe("GatewayWsClient", () => {
     expect(req.method).toBe("connect");
     expect(req.params.client.id).toBe("openclaw-control-ui");
     expect(req.params.auth.token).toBe("test-token");
+  });
+
+  it("includes signed device identity in secure contexts", async () => {
+    Object.defineProperty(window, "isSecureContext", {
+      configurable: true,
+      value: true,
+    });
+    client.connect("ws://localhost:18789", "test-token");
+
+    await vi.advanceTimersByTimeAsync(10);
+
+    const ws = MockWebSocket.instances[0];
+    ws.simulateMessage({
+      type: "event",
+      event: "connect.challenge",
+      payload: { nonce: "nonce-123" },
+    });
+    await vi.waitFor(() => expect(ws.sent.length).toBe(1));
+
+    const req = JSON.parse(ws.sent[0]);
+    expect(req.params.device.id).toMatch(/^[0-9a-f]{64}$/);
+    expect(req.params.device.publicKey).toBeTruthy();
+    expect(req.params.device.signature).toBeTruthy();
+    expect(req.params.device.nonce).toBe("nonce-123");
   });
 
   it("updates status to connected on hello-ok", async () => {

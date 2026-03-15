@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { isMockMode } from "@/gateway/adapter-provider";
 import { useProjectionStore } from "@/perception/projection-store";
 import type { AgentProjection } from "@/perception/types";
+import { useOfficeStore } from "@/store/office-store";
+import { useCronStore } from "@/store/console-stores/cron-store";
 import { AgentCharacter2D5 } from "./characters/AgentCharacter2D5";
 import { SUB_AGENT_SLOTS } from "./characters/constants";
 import { SubAgentGhost, allocateSubAgentSlots } from "./characters/SubAgentGhost";
@@ -106,6 +108,7 @@ function assignAgentsToDesks(agents: Map<string, AgentProjection>): DeskAssignme
 
 export function LivingOfficeView() {
   const agents = useProjectionStore((s) => s.agents);
+  const connectionStatus = useOfficeStore((s) => s.connectionStatus);
   const engine = usePerceptionEngine();
   const autoPlayCleanup = useRef<(() => void) | null>(null);
 
@@ -139,6 +142,24 @@ export function LivingOfficeView() {
   }, [engine]);
 
   const handleNoop = useCallback(() => {}, []);
+
+  useEffect(() => {
+    if (!isMockMode() && connectionStatus !== "connected") {
+      return;
+    }
+
+    const cronStore = useCronStore.getState();
+    void cronStore.fetchTasks();
+    const unsubscribe = cronStore.initEventListeners();
+    const timer = setInterval(() => {
+      void useCronStore.getState().fetchTasks();
+    }, 30_000);
+
+    return () => {
+      clearInterval(timer);
+      unsubscribe();
+    };
+  }, [connectionStatus]);
 
   return (
     <div

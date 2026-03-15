@@ -1,4 +1,6 @@
 import { uuid } from "@/lib/uuid";
+import { buildDeviceAuthPayload } from "./device-auth";
+import { loadOrCreateDeviceIdentity, signDevicePayload } from "./device-identity";
 import type {
   ConnectionStatus,
   ConnectParams,
@@ -141,7 +143,14 @@ export class GatewayWsClient {
 
   private handleEvent(frame: GatewayEventFrame): void {
     if (frame.event === "connect.challenge") {
-      this.sendConnect();
+      const nonce =
+        typeof frame.payload === "object" &&
+        frame.payload !== null &&
+        "nonce" in frame.payload &&
+        typeof (frame.payload as { nonce?: unknown }).nonce === "string"
+          ? (frame.payload as { nonce: string }).nonce
+          : "";
+      void this.sendConnect(nonce);
       return;
     }
 
@@ -182,10 +191,13 @@ export class GatewayWsClient {
     }
   }
 
-  private sendConnect(): void {
+  private async sendConnect(nonce: string): Promise<void> {
+    const role = "operator";
+    const scopes = ["operator.admin"];
     const params: ConnectParams = {
-      minProtocol: 1,
+      minProtocol: 3,
       maxProtocol: 3,
+      role,
       client: {
         id: "openclaw-control-ui",
         version: "0.1.0",
@@ -193,11 +205,45 @@ export class GatewayWsClient {
         mode: "ui",
       },
       caps: ["tool-events"],
-      scopes: ["operator.admin"],
+      scopes,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      locale: typeof navigator !== "undefined" ? navigator.language : undefined,
     };
 
     if (this.token) {
       params.auth = { token: this.token };
+    }
+
+    const canUseDeviceIdentity =
+      typeof window !== "undefined" &&
+      window.isSecureContext &&
+      typeof crypto !== "undefined" &&
+      typeof crypto.subtle !== "undefined";
+
+    if (canUseDeviceIdentity) {
+      try {
+        const identity = await loadOrCreateDeviceIdentity();
+        const signedAtMs = Date.now();
+        const payload = buildDeviceAuthPayload({
+          deviceId: identity.deviceId,
+          clientId: params.client.id,
+          clientMode: params.client.mode,
+          role,
+          scopes,
+          signedAtMs,
+          token: this.token || null,
+          nonce,
+        });
+        params.device = {
+          id: identity.deviceId,
+          publicKey: identity.publicKey,
+          signature: await signDevicePayload(identity.privateKey, payload),
+          signedAt: signedAtMs,
+          nonce,
+        };
+      } catch {
+        // Fall back to token-only auth; Gateway will return a precise error if device auth is required.
+      }
     }
 
     this.send({

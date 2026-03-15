@@ -144,6 +144,38 @@ describe("ProjectionStore", () => {
       expect(useProjectionStore.getState().sceneArea.cronTasks).toHaveLength(1);
       expect(useProjectionStore.getState().sceneArea.cronTasks[0].name).toBe("每日报告生成");
     });
+
+    it("syncs memory wall items from live perceived events", () => {
+      useProjectionStore.getState().applyPerceivedEvent(
+        makePerceived("CALL_TOOL", ["agent1"], { area: "staff", summary: "调用 web_search" }),
+      );
+
+      expect(useProjectionStore.getState().sceneArea.memoryItems).toEqual([
+        { text: "调用 web_search", tag: "tool" },
+      ]);
+    });
+
+    it("syncs project room items from sub-agent events", () => {
+      useProjectionStore.getState().applyPerceivedEvent(
+        makePerceived("SPAWN_SUBAGENT", ["agent1", "sub1"], {
+          area: "project",
+          summary: "拉起分析子代理",
+        }),
+      );
+
+      expect(useProjectionStore.getState().sceneArea.projectTasks).toHaveLength(1);
+      expect(useProjectionStore.getState().sceneArea.projectTasks[0].title).toBe("拉起分析子代理");
+    });
+
+    it("syncs ops board items from incidents", () => {
+      useProjectionStore.getState().applyPerceivedEvent(
+        makePerceived("BLOCK", ["agent1"], { area: "ops", summary: "主流程阻塞" }),
+      );
+
+      expect(useProjectionStore.getState().sceneArea.opsRules).toEqual([
+        { text: "主流程阻塞", tag: "incident" },
+      ]);
+    });
   });
 
   describe("resetAgent", () => {

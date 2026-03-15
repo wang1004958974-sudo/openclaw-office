@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { readFileSync } from "node:fs";
 import { readFile, access } from "node:fs/promises";
 import { resolve, join, extname } from "node:path";
@@ -139,8 +139,10 @@ const config = resolveConfig();
 const runtimeConfig = JSON.stringify({
   gatewayUrl: config.gatewayUrl,
   gatewayToken: config.token,
+  gatewayWsPath: "/gateway-ws",
 });
 const configScript = `<script>window.__OPENCLAW_CONFIG__=${runtimeConfig};</script>`;
+const gatewayWsPrefixes = new Set(["/gateway-ws", "/api/gateway/ws"]);
 
 async function tryReadFile(filePath) {
   try {
@@ -158,6 +160,128 @@ async function getIndexHtml() {
   const raw = await readFile(join(distDir, "index.html"), "utf-8");
   indexHtmlCache = raw.replace("</head>", `${configScript}\n</head>`);
   return indexHtmlCache;
+}
+
+function toHttpUrl(rawUrl) {
+  const url = new URL(rawUrl);
+  if (url.protocol === "ws:") {
+    url.protocol = "http:";
+  } else if (url.protocol === "wss:") {
+    url.protocol = "https:";
+  }
+  return url;
+}
+
+function serializeUpgradeResponse(res) {
+  const lines = [`HTTP/1.1 ${res.statusCode} ${res.statusMessage}`];
+  for (const [key, value] of Object.entries(res.headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        lines.push(`${key}: ${item}`);
+      }
+    } else if (typeof value !== "undefined") {
+      lines.push(`${key}: ${value}`);
+    }
+  }
+  lines.push("\r\n");
+  return lines.join("\r\n");
+}
+
+function writeSocketError(socket, statusCode, message) {
+  if (socket.destroyed) {
+    return;
+  }
+  socket.write(
+    `HTTP/1.1 ${statusCode} ${message}\r\nConnection: close\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: ${Buffer.byteLength(message)}\r\n\r\n${message}`,
+  );
+  socket.destroy();
+}
+
+function proxyWsUpgrade(req, downstreamSocket, downstreamHead) {
+  const upstreamUrl = toHttpUrl(config.gatewayUrl);
+  const headers = {
+    host: upstreamUrl.host,
+    connection: "Upgrade",
+    upgrade: "websocket",
+    origin: upstreamUrl.origin,
+    "sec-websocket-version": req.headers["sec-websocket-version"] || "13",
+    "sec-websocket-key": req.headers["sec-websocket-key"],
+  };
+  if (req.headers["sec-websocket-protocol"]) {
+    headers["sec-websocket-protocol"] = req.headers["sec-websocket-protocol"];
+  }
+
+  const upstreamReq = httpRequest(upstreamUrl, { method: "GET", headers });
+  let settled = false;
+  let upgraded = false;
+
+  const fail = (statusCode, message) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    writeSocketError(downstreamSocket, statusCode, message);
+  };
+
+  upstreamReq.on("upgrade", (upstreamRes, upstreamSocket, upstreamHead) => {
+    if (settled) {
+      upstreamSocket.destroy();
+      return;
+    }
+    settled = true;
+    upgraded = true;
+
+    if (downstreamSocket.destroyed) {
+      upstreamSocket.destroy();
+      return;
+    }
+
+    downstreamSocket.write(serializeUpgradeResponse(upstreamRes));
+
+    if (downstreamHead.length > 0) {
+      upstreamSocket.write(downstreamHead);
+    }
+    if (upstreamHead.length > 0) {
+      downstreamSocket.write(upstreamHead);
+    }
+
+    downstreamSocket.pipe(upstreamSocket, { end: false });
+    upstreamSocket.pipe(downstreamSocket, { end: false });
+
+    const closeBoth = () => {
+      if (!downstreamSocket.destroyed) {
+        downstreamSocket.destroy();
+      }
+      if (!upstreamSocket.destroyed) {
+        upstreamSocket.destroy();
+      }
+    };
+
+    downstreamSocket.on("error", closeBoth);
+    upstreamSocket.on("error", closeBoth);
+    downstreamSocket.on("close", closeBoth);
+    upstreamSocket.on("close", closeBoth);
+  });
+
+  upstreamReq.on("response", (upstreamRes) => {
+    upstreamRes.resume();
+    fail(upstreamRes.statusCode || 502, upstreamRes.statusMessage || "Bad Gateway");
+  });
+  upstreamReq.on("error", () => {
+    fail(502, "Bad Gateway");
+  });
+  downstreamSocket.on("error", () => {
+    if (!upgraded) {
+      upstreamReq.destroy();
+    }
+  });
+  downstreamSocket.on("close", () => {
+    if (!upgraded) {
+      upstreamReq.destroy();
+    }
+  });
+
+  upstreamReq.end();
 }
 
 const server = createServer(async (req, res) => {
@@ -188,6 +312,15 @@ const server = createServer(async (req, res) => {
   const html = await getIndexHtml();
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(html);
+});
+
+server.on("upgrade", (req, socket, head) => {
+  const pathname = new URL(req.url || "/", "http://localhost").pathname;
+  if (!gatewayWsPrefixes.has(pathname)) {
+    writeSocketError(socket, 404, "Not Found");
+    return;
+  }
+  proxyWsUpgrade(req, socket, head);
 });
 
 server.listen(config.port, config.host, () => {

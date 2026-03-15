@@ -19,7 +19,10 @@ export function DeveloperSection() {
     | Record<string, unknown>
     | undefined;
   const tokenConfigured = gatewayAuth?.token === REDACTED_SENTINEL;
-  const wsUrl = import.meta.env.VITE_GATEWAY_URL || "ws://localhost:18789";
+  const gatewayWsPath = import.meta.env.VITE_GATEWAY_WS_PATH || "/gateway-ws";
+  const wsUrl = gatewayWsPath.startsWith("/")
+    ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}${gatewayWsPath}`
+    : gatewayWsPath;
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);

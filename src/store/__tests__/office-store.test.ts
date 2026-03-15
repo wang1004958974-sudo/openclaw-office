@@ -173,6 +173,30 @@ describe("office-store", () => {
     });
   });
 
+  describe("token snapshots", () => {
+    it("updates global token metrics from pushed snapshots", () => {
+      useOfficeStore.getState().pushTokenSnapshot({
+        timestamp: 60_000,
+        total: 1200,
+        byAgent: { a1: 1200 },
+      });
+
+      let state = useOfficeStore.getState();
+      expect(state.globalMetrics.totalTokens).toBe(1200);
+      expect(state.globalMetrics.tokenRate).toBe(0);
+
+      useOfficeStore.getState().pushTokenSnapshot({
+        timestamp: 120_000,
+        total: 1800,
+        byAgent: { a1: 1800 },
+      });
+
+      state = useOfficeStore.getState();
+      expect(state.globalMetrics.totalTokens).toBe(1800);
+      expect(state.globalMetrics.tokenRate).toBe(600);
+    });
+  });
+
   describe("viewMode", () => {
     it("setViewMode switches to 3d", () => {
       useOfficeStore.getState().setViewMode("3d");

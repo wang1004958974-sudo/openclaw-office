@@ -39,6 +39,7 @@ export type GatewayFrame = GatewayRequest | GatewayResponseFrame | GatewayEventF
 export interface ConnectParams {
   minProtocol: number;
   maxProtocol: number;
+  role?: string;
   client: {
     id: string;
     version: string;
@@ -48,8 +49,18 @@ export interface ConnectParams {
   caps: string[];
   scopes?: string[];
   auth?: {
-    token: string;
+    token?: string;
+    deviceToken?: string;
   };
+  device?: {
+    id: string;
+    publicKey: string;
+    signature: string;
+    signedAt: number;
+    nonce: string;
+  };
+  userAgent?: string;
+  locale?: string;
 }
 
 export interface HealthAgentInfo {
@@ -76,6 +87,12 @@ export interface HelloOk {
     connId?: string;
   };
   features?: Record<string, unknown>;
+  auth?: {
+    deviceToken?: string;
+    role?: string;
+    scopes?: string[];
+    issuedAtMs?: number;
+  };
   snapshot?: {
     presence?: unknown;
     health?: HealthSnapshot;

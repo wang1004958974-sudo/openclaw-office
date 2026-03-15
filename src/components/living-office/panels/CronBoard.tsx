@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+import { useCronStore } from "@/store/console-stores/cron-store";
 import { GlassPanel } from "./GlassPanel";
 import { PanelHead } from "./PanelHead";
 
@@ -12,6 +14,21 @@ interface CronBoardProps {
 }
 
 export function CronBoard({ tasks = DEFAULT_CRON_TASKS }: CronBoardProps) {
+  const cronTasks = useCronStore((s) => s.tasks);
+  const liveTasks = useMemo(
+    () =>
+      cronTasks.map((task) => ({
+        name: task.name,
+        status: task.state.runningAtMs
+          ? "running"
+          : !task.enabled
+            ? "paused"
+            : task.state.lastRunStatus ?? "scheduled",
+      })),
+    [cronTasks],
+  );
+  const displayTasks = liveTasks.length > 0 ? liveTasks : tasks;
+
   return (
     <GlassPanel
       style={{
@@ -32,7 +49,7 @@ export function CronBoard({ tasks = DEFAULT_CRON_TASKS }: CronBoardProps) {
           padding: "0 14px 14px",
         }}
       >
-        {tasks.map((task) => (
+        {displayTasks.slice(0, 3).map((task) => (
           <MiniRow key={task.name} left={task.name} right={task.status} />
         ))}
       </div>

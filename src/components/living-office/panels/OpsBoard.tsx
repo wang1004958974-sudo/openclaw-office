@@ -1,18 +1,34 @@
+import { useProjectionStore } from "@/perception/projection-store";
+import { useOfficeStore } from "@/store/office-store";
 import { GlassPanel } from "./GlassPanel";
 import { PanelHead } from "./PanelHead";
-
-const DEFAULT_RULES = [
-  "Gateway 接收外部消息并做事件压缩",
-  "General Manager 负责主线调度",
-  "高频内部事件只进状态，不强制人物移动",
-  "长任务才允许出现跨区走动",
-];
 
 interface OpsBoardProps {
   rules?: string[];
 }
 
-export function OpsBoard({ rules = DEFAULT_RULES }: OpsBoardProps) {
+export function OpsBoard({ rules = [] }: OpsBoardProps) {
+  const opsEvents = useProjectionStore((s) => s.sceneArea.opsRules);
+  const agents = useOfficeStore((s) => s.agents);
+  const links = useOfficeStore((s) => s.links);
+  const maxSubAgents = useOfficeStore((s) => s.maxSubAgents);
+  const agentToAgentConfig = useOfficeStore((s) => s.agentToAgentConfig);
+
+  const errorCount = Array.from(agents.values()).filter((agent) => agent.status === "error").length;
+  const activeSubAgents = Array.from(agents.values()).filter(
+    (agent) => agent.isSubAgent && !agent.isPlaceholder,
+  ).length;
+  const liveRules =
+    opsEvents.length > 0
+      ? opsEvents.slice(-4).reverse().map((entry) => `${entry.tag} · ${entry.text}`)
+      : [
+        `error-agents · ${errorCount}`,
+        `collaboration-links · ${links.length}`,
+        `agent-to-agent · ${agentToAgentConfig.enabled ? "enabled" : "disabled"}`,
+        `sub-agent-capacity · ${activeSubAgents}/${maxSubAgents}`,
+      ];
+  const displayRules = liveRules.length > 0 ? liveRules : rules;
+
   return (
     <GlassPanel
       style={{
@@ -33,7 +49,7 @@ export function OpsBoard({ rules = DEFAULT_RULES }: OpsBoardProps) {
           padding: "0 14px 14px",
         }}
       >
-        {rules.map((rule) => (
+        {displayRules.slice(0, 4).map((rule) => (
           <div
             key={rule}
             style={{
@@ -47,7 +63,7 @@ export function OpsBoard({ rules = DEFAULT_RULES }: OpsBoardProps) {
             }}
           >
             <span style={{ color: "#e6eefc" }}>{rule}</span>
-            <span style={{ color: "var(--lo-muted)" }}>policy</span>
+            <span style={{ color: "var(--lo-muted)" }}>live</span>
           </div>
         ))}
       </div>

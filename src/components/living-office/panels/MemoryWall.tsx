@@ -1,3 +1,4 @@
+import { useProjectionStore } from "@/perception/projection-store";
 import { GlassPanel } from "./GlassPanel";
 import { PanelHead } from "./PanelHead";
 
@@ -11,6 +12,9 @@ const DEFAULT_ENTRIES = [
 ];
 
 export function MemoryWall({ entries = DEFAULT_ENTRIES }: MemoryWallProps) {
+  const liveEntries = useProjectionStore((s) => s.sceneArea.memoryItems);
+  const displayEntries = liveEntries.length > 0 ? liveEntries : entries;
+
   return (
     <GlassPanel
       style={{
@@ -31,7 +35,7 @@ export function MemoryWall({ entries = DEFAULT_ENTRIES }: MemoryWallProps) {
           padding: "0 14px 14px",
         }}
       >
-        {entries.slice(0, 3).map((entry) => (
+        {displayEntries.slice(-3).reverse().map((entry) => (
           <div
             key={entry.text}
             style={{

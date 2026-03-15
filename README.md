@@ -153,17 +153,20 @@ Get your Gateway token:
 openclaw config get gateway.auth.token
 ```
 
-### 3. Enable Device Auth Bypass (Required)
+### 3. Browser Device Identity
 
-OpenClaw Office is a pure web application and cannot provide Ed25519 device identity signatures that Gateway 2026.2.15+ requires for operator scopes. You must configure the Gateway to bypass this requirement:
+OpenClaw Office now performs the same browser-side device identity signing flow as the built-in OpenClaw Control UI. In the common cases below, you should not need `gateway.controlUi.dangerouslyDisableDeviceAuth`:
+
+- OpenClaw Office opened on `http://localhost:*` or `http://127.0.0.1:*`
+- OpenClaw Office served over HTTPS
+
+If you open OpenClaw Office from a remote machine over plain HTTP, the browser may not expose `crypto.subtle`, so Gateway can still reject the connection. In that case, prefer HTTPS first. Only use the dangerous bypass as a temporary last resort:
 
 ```bash
 openclaw config set gateway.controlUi.dangerouslyDisableDeviceAuth true
 ```
 
-**Restart the Gateway** after this configuration change.
-
-> **Security Note:** This bypass is intended for local development. In production, use a reverse proxy or other secure authentication mechanism.
+If you change Gateway auth policy, restart Gateway afterward.
 
 ### 4. Start the Gateway
 
@@ -186,6 +189,7 @@ Open `http://localhost:5180` in your browser.
 | Variable             | Required                              | Default                | Description                          |
 | -------------------- | ------------------------------------- | ---------------------- | ------------------------------------ |
 | `VITE_GATEWAY_URL`   | No                                    | `ws://localhost:18789` | Gateway WebSocket address            |
+| `VITE_GATEWAY_WS_PATH` | No                                  | `/gateway-ws`          | Browser-side reverse proxy WS path   |
 | `VITE_GATEWAY_TOKEN` | Yes (when connecting to real Gateway) | —                      | Gateway auth token                   |
 | `VITE_MOCK`          | No                                    | `false`                | Enable mock mode (no Gateway needed) |
 
