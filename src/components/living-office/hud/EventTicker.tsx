@@ -1,15 +1,7 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useProjectionStore } from "@/perception/projection-store";
 import { GlassCard } from "./GlassCard";
-
-const FALLBACK_ITEMS = [
-  { title: "客户消息到达", desc: "Telegram → Gateway 事件总线" },
-  { title: "GM 接单分发", desc: "智能路由 → 匹配最佳 Agent" },
-  { title: "Sales 分析报告", desc: "工具调用 → 生成分析结论" },
-  { title: "Cron 定时广播", desc: "周期任务 → 全员通知" },
-  { title: "Heartbeat 巡检", desc: "健康脉冲 → 状态同步" },
-  { title: "Sub-Agent 协作", desc: "拉起子 Agent → 并行执行" },
-];
 
 function CollapsedTicker({ items }: { items: { title: string; desc: string }[] }) {
   const latest = items[items.length - 1];
@@ -45,7 +37,17 @@ function CollapsedTicker({ items }: { items: { title: string; desc: string }[] }
 }
 
 export function EventTicker() {
+  const { t } = useTranslation("office");
   const narrativeLogs = useProjectionStore((s) => s.narrativeLogs);
+
+  const fallbackItems = useMemo(() => [
+    { title: t("livingOffice.fallbackEvents.msgArrival"), desc: t("livingOffice.fallbackEvents.msgArrivalDesc") },
+    { title: t("livingOffice.fallbackEvents.gmDispatch"), desc: t("livingOffice.fallbackEvents.gmDispatchDesc") },
+    { title: t("livingOffice.fallbackEvents.salesReport"), desc: t("livingOffice.fallbackEvents.salesReportDesc") },
+    { title: t("livingOffice.fallbackEvents.cronBroadcast"), desc: t("livingOffice.fallbackEvents.cronBroadcastDesc") },
+    { title: t("livingOffice.fallbackEvents.heartbeat"), desc: t("livingOffice.fallbackEvents.heartbeatDesc") },
+    { title: t("livingOffice.fallbackEvents.subAgentCollab"), desc: t("livingOffice.fallbackEvents.subAgentCollabDesc") },
+  ], [t]);
 
   const items = useMemo(() => {
     if (narrativeLogs.length >= 3) {
@@ -54,20 +56,20 @@ export function EventTicker() {
         desc: log.text,
       }));
     }
-    return FALLBACK_ITEMS;
-  }, [narrativeLogs]);
+    return fallbackItems;
+  }, [narrativeLogs, fallbackItems]);
 
   const doubled = useMemo(() => [...items, ...items], [items]);
 
   return (
     <GlassCard
-      tag="Perception Layer"
-      title="事件流转叙事"
+      tag={t("livingOffice.hud.tickerTag")}
+      title={t("livingOffice.hud.tickerTitle")}
       storageKey="lo-hud-ticker"
       collapsedContent={<CollapsedTicker items={items} />}
     >
       <div style={{ fontSize: 10, color: "var(--lo-muted)", marginBottom: 4 }}>
-        把毫秒级系统事件压缩成秒级可感知组织行为
+        {t("livingOffice.hud.tickerSubtitle")}
       </div>
 
       <div

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { GlassCard } from "./GlassCard";
 
 interface DemoButton {
@@ -11,27 +12,30 @@ interface ControlPanelProps {
   buttons: DemoButton[];
 }
 
-const LEGEND_ITEMS = [
-  { color: "var(--lo-good)", label: "空闲/正常" },
-  { color: "var(--lo-cyan)", label: "忙碌/执行中" },
-  { color: "var(--lo-bad)", label: "阻塞/异常" },
-  { color: "var(--lo-warn)", label: "Heartbeat" },
-  { color: "var(--lo-violet)", label: "Cron" },
-];
-
 function CollapsedControls() {
+  const { t } = useTranslation("office");
   return (
     <span style={{ fontSize: 9, color: "var(--lo-muted)", opacity: 0.7 }}>
-      展开操作台
+      {t("livingOffice.hud.controlExpand")}
     </span>
   );
 }
 
 export function ControlPanel({ buttons }: ControlPanelProps) {
+  const { t } = useTranslation("office");
+
+  const legendItems = [
+    { color: "var(--lo-good)", label: t("livingOffice.hud.legendIdle") },
+    { color: "var(--lo-cyan)", label: t("livingOffice.hud.legendBusy") },
+    { color: "var(--lo-bad)", label: t("livingOffice.hud.legendBlocked") },
+    { color: "var(--lo-warn)", label: t("livingOffice.hud.legendHeartbeat") },
+    { color: "var(--lo-violet)", label: t("livingOffice.hud.legendCron") },
+  ];
+
   return (
     <GlassCard
-      tag="Preview Controls"
-      title="交互触发"
+      tag={t("livingOffice.hud.controlTag")}
+      title={t("livingOffice.hud.controlTitle")}
       storageKey="lo-hud-control"
       collapsedContent={<CollapsedControls />}
     >
@@ -68,7 +72,7 @@ export function ControlPanel({ buttons }: ControlPanelProps) {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 5, flexWrap: "wrap" }}>
-        {LEGEND_ITEMS.map((item) => (
+        {legendItems.map((item) => (
           <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 3 }}>
             <span
               style={{

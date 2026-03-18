@@ -103,7 +103,7 @@ export function useSubAgentPoller(rpcClient: React.RefObject<GatewayRpcClient | 
 
         for (const sub of removed) {
           if (useOfficeStore.getState().agents.has(sub.agentId)) {
-            useOfficeStore.getState().removeSubAgent(sub.agentId);
+            useOfficeStore.getState().retireSubAgent(sub.agentId);
           }
         }
 

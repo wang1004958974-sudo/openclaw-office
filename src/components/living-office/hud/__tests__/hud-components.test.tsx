@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
+import i18n from "@/i18n";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 import { GatewayStatus } from "../GatewayStatus";
@@ -7,6 +8,8 @@ import { StatsPanel } from "../StatsPanel";
 import { EventLogPanel } from "../EventLogPanel";
 import { HudBar } from "../HudBar";
 import { EventTicker } from "../EventTicker";
+
+const t = (key: string) => i18n.t(`office:${key}`);
 
 describe("HudBar", () => {
   it("renders three slots", () => {
@@ -46,8 +49,8 @@ describe("GatewayStatus", () => {
         <GatewayStatus />
       </div>,
     );
-    expect(screen.getByText("WS 在线")).toBeInTheDocument();
-    expect(screen.getByText("Gateway 中控大厅")).toBeInTheDocument();
+    expect(screen.getByText(t("livingOffice.hud.wsOnline"))).toBeInTheDocument();
+    expect(screen.getByText(t("livingOffice.hud.gatewayTitle"))).toBeInTheDocument();
   });
 
   it("shows offline status when disconnected", () => {
@@ -57,16 +60,15 @@ describe("GatewayStatus", () => {
         <GatewayStatus />
       </div>,
     );
-    expect(screen.getByText("WS 断开")).toBeInTheDocument();
+    expect(screen.getByText(t("livingOffice.hud.wsOffline"))).toBeInTheDocument();
   });
 
-  it("renders gateway stream lines", () => {
+  it("renders active gateway stream lines in collapsed content", () => {
     render(
       <div className="living-office">
         <GatewayStatus />
       </div>,
     );
-    expect(screen.getByText("WebSocket")).toBeInTheDocument();
     expect(screen.getByText("Event Bus")).toBeInTheDocument();
   });
 });
@@ -94,8 +96,8 @@ describe("StatsPanel", () => {
         <StatsPanel />
       </div>,
     );
-    expect(screen.getByText("运行指标")).toBeInTheDocument();
-    expect(screen.getAllByText("活跃").length).toBeGreaterThan(0);
+    expect(screen.getByText(t("livingOffice.hud.statsTitle"))).toBeInTheDocument();
+    expect(screen.getAllByText(t("livingOffice.hud.statsActive")).length).toBeGreaterThan(0);
   });
 
   it("shows cron task count", () => {
@@ -104,7 +106,7 @@ describe("StatsPanel", () => {
         <StatsPanel />
       </div>,
     );
-    expect(screen.getAllByText("Cron").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(t("livingOffice.hud.statsCron")).length).toBeGreaterThan(0);
   });
 });
 
@@ -116,7 +118,7 @@ describe("EventLogPanel", () => {
         <EventLogPanel />
       </div>,
     );
-    expect(screen.getByText("等待事件…")).toBeInTheDocument();
+    expect(screen.getByText(t("livingOffice.hud.eventLogWaiting"))).toBeInTheDocument();
   });
 
   it("renders narrative logs", () => {
@@ -142,7 +144,7 @@ describe("EventTicker", () => {
         <EventTicker />
       </div>,
     );
-    expect(screen.getByText("事件流转叙事")).toBeInTheDocument();
-    expect(screen.getAllByText("客户消息到达").length).toBeGreaterThan(0);
+    expect(screen.getByText(t("livingOffice.hud.tickerTitle"))).toBeInTheDocument();
+    expect(screen.getAllByText(t("livingOffice.fallbackEvents.msgArrival")).length).toBeGreaterThan(0);
   });
 });

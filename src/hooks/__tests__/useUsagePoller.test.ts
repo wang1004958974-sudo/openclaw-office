@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildSnapshotFromSessions } from "@/hooks/useUsagePoller";
+import { buildAgentCostsFromSessionsUsage, buildSnapshotFromSessions } from "@/hooks/useUsagePoller";
 
 describe("buildSnapshotFromSessions", () => {
   it("aggregates fresh session totals by agent", () => {
@@ -31,5 +31,35 @@ describe("buildSnapshotFromSessions", () => {
     ]);
 
     expect(snapshot).toBeNull();
+  });
+});
+
+describe("buildAgentCostsFromSessionsUsage", () => {
+  it("extracts per-agent total cost from sessions.usage aggregates", () => {
+    const costs = buildAgentCostsFromSessionsUsage({
+      aggregates: {
+        byAgent: [
+          { agentId: "main", totals: { totalCost: 1.25 } },
+          { agentId: "reviewer", totals: { totalCost: 0.4 } },
+          { agentId: "zero", totals: { totalCost: 0 } },
+        ],
+      },
+    });
+
+    expect(costs).toEqual({
+      main: 1.25,
+      reviewer: 0.4,
+    });
+  });
+
+  it("returns null when sessions.usage has no usable agent costs", () => {
+    expect(
+      buildAgentCostsFromSessionsUsage({
+        aggregates: {
+          byAgent: [{ agentId: "main", totals: { totalCost: 0 } }],
+        },
+      }),
+    ).toBeNull();
+    expect(buildAgentCostsFromSessionsUsage(null)).toBeNull();
   });
 });

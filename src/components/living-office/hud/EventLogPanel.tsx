@@ -1,16 +1,20 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { useProjectionStore } from "@/perception/projection-store";
 import { GlassCard } from "./GlassCard";
 
 function formatTime(ts: number): string {
   const d = new Date(ts);
-  return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const locale = i18n.language === "zh" ? "zh-CN" : "en-US";
+  return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function LogCount({ count }: { count: number }) {
+  const { t } = useTranslation("office");
   return (
     <span style={{ fontSize: 9, color: "var(--lo-muted)", opacity: 0.8 }}>
-      {count} 条
+      {t("livingOffice.hud.eventLogCount", { count })}
     </span>
   );
 }
@@ -32,6 +36,7 @@ function CollapsedLog({ text }: { text: string }) {
 }
 
 export function EventLogPanel() {
+  const { t } = useTranslation("office");
   const narrativeLogs = useProjectionStore((s) => s.narrativeLogs);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -43,14 +48,15 @@ export function EventLogPanel() {
 
   const latestText = narrativeLogs.length > 0
     ? narrativeLogs[narrativeLogs.length - 1].text
-    : "等待事件…";
+    : t("livingOffice.hud.eventLogWaiting");
 
   return (
     <GlassCard
-      tag="Narrative Log"
-      title="事件日志"
+      tag={t("livingOffice.hud.eventLogTag")}
+      title={t("livingOffice.hud.eventLogTitle")}
       headerExtra={<LogCount count={narrativeLogs.length} />}
       storageKey="lo-hud-log"
+      defaultCollapsed
       collapsedContent={<CollapsedLog text={latestText} />}
     >
       <div
@@ -66,7 +72,7 @@ export function EventLogPanel() {
       >
         {narrativeLogs.length === 0 ? (
           <div style={{ fontSize: 10, color: "var(--lo-muted)", opacity: 0.5, fontStyle: "italic" }}>
-            等待事件…
+            {t("livingOffice.hud.eventLogWaiting")}
           </div>
         ) : (
           narrativeLogs.map((log, i) => (

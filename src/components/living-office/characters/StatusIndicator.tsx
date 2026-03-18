@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { PerceivedAgentState } from "@/perception/types";
 
 interface StatusIndicatorProps {
@@ -19,6 +20,8 @@ const INDICATOR_STYLE: React.CSSProperties = {
 };
 
 export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
+  const { t } = useTranslation("office");
+
   switch (state) {
     case "WORKING":
       return (
@@ -32,7 +35,7 @@ export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
           }}
         >
           <span className="lo-status-gear">⚙</span>
-          <span style={{ color: "#7dd5ff", fontSize: 9 }}>处理中</span>
+          <span style={{ color: "#7dd5ff", fontSize: 9 }}>{t("livingOffice.status.working")}</span>
         </div>
       );
 
@@ -49,7 +52,7 @@ export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
             color: "#fbbf24",
           }}
         >
-          🔧 {toolName ?? "tool"}
+          🔧 {toolName ?? t("livingOffice.status.tool")}
         </div>
       );
 
@@ -94,7 +97,7 @@ export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
           }}
         >
           <span className="lo-status-collab-icon">🤝</span>
-          <span style={{ fontSize: 9 }}>协作</span>
+          <span style={{ fontSize: 9 }}>{t("livingOffice.status.collaborating")}</span>
         </div>
       );
 
@@ -121,7 +124,7 @@ export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
             fontSize: 9,
           }}
         >
-          ✅ 完成回报
+          ✅ {t("livingOffice.status.returning")}
         </div>
       );
 
@@ -135,7 +138,7 @@ export function StatusIndicator({ state, toolName }: StatusIndicatorProps) {
             fontSize: 9,
           }}
         >
-          🔄 恢复
+          🔄 {t("livingOffice.status.recovered")}
         </div>
       );
 

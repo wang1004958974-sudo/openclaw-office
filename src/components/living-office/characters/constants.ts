@@ -64,31 +64,48 @@ export interface Position2D {
 }
 
 export const AGENT_HOME_POSITIONS: Record<string, Position2D> = {
-  "desk-gm": { left: 170 + DESK_CHAR_OFFSET_X, top: 430 + DESK_CHAR_OFFSET_Y },
-  "desk-sales": { left: 390 + DESK_CHAR_OFFSET_X, top: 430 + DESK_CHAR_OFFSET_Y },
-  "desk-ops": { left: 610 + DESK_CHAR_OFFSET_X, top: 430 + DESK_CHAR_OFFSET_Y },
-  "desk-fin": { left: 280 + DESK_CHAR_OFFSET_X, top: 590 + DESK_CHAR_OFFSET_Y },
-  "desk-it": { left: 520 + DESK_CHAR_OFFSET_X, top: 590 + DESK_CHAR_OFFSET_Y },
+  "desk-gm": { left: 110 + DESK_CHAR_OFFSET_X, top: 360 + DESK_CHAR_OFFSET_Y },
+  "desk-sales": { left: 330 + DESK_CHAR_OFFSET_X, top: 360 + DESK_CHAR_OFFSET_Y },
+  "desk-ops": { left: 550 + DESK_CHAR_OFFSET_X, top: 360 + DESK_CHAR_OFFSET_Y },
+  "desk-fin": { left: 770 + DESK_CHAR_OFFSET_X, top: 360 + DESK_CHAR_OFFSET_Y },
+  "desk-it": { left: 440 + DESK_CHAR_OFFSET_X, top: 500 + DESK_CHAR_OFFSET_Y },
 };
 
 // --- 区域目标坐标映射 ---
 
 export const POSITION_MAP: Record<string, Position2D> = {
   ...AGENT_HOME_POSITIONS,
-  gateway: { left: 238, top: 184 },
-  ops: { left: 675, top: 180 },
-  cron: { left: 1100, top: 170 },
-  project: { left: 1100, top: 435 },
-  memory: { left: 1095, top: 625 },
-  whiteboard: { left: 675, top: 180 },
+  gateway: { left: 250, top: 145 },
+  ops: { left: 760, top: 145 },
+  cron: { left: 1240, top: 145 },
+  project: { left: 1240, top: 405 },
+  memory: { left: 1240, top: 590 },
+  lounge: { left: 730, top: 770 },
+  whiteboard: { left: 760, top: 145 },
 };
 
 // --- 项目室 Sub-agent 坐标位 ---
 
 export const SUB_AGENT_SLOTS: Position2D[] = [
-  { left: 1020, top: 400 },
-  { left: 1100, top: 460 },
-  { left: 1180, top: 400 },
+  { left: 1140, top: 370 },
+  { left: 1240, top: 430 },
+  { left: 1340, top: 370 },
+];
+
+// --- Lounge 沙发坐标位 ---
+
+export const LOUNGE_SOFA_POSITIONS: Position2D[] = [
+  { left: 120, top: 730 },
+  { left: 340, top: 730 },
+  { left: 560, top: 730 },
+  { left: 780, top: 730 },
+  { left: 1000, top: 730 },
+  { left: 1220, top: 730 },
+  { left: 230, top: 810 },
+  { left: 450, top: 810 },
+  { left: 670, top: 810 },
+  { left: 890, top: 810 },
+  { left: 1110, top: 810 },
 ];
 
 export const MAX_SUB_AGENTS = 3;

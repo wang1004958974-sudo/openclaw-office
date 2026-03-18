@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useProjectionStore } from "@/perception/projection-store";
 import { GlassCard } from "./GlassCard";
 
@@ -25,6 +26,7 @@ function CollapsedStats({ stats }: { stats: { label: string; value: number; colo
 }
 
 export function StatsPanel() {
+  const { t } = useTranslation("office");
   const agents = useProjectionStore((s) => s.agents);
   const cronTasks = useProjectionStore((s) => s.sceneArea.cronTasks);
 
@@ -45,15 +47,16 @@ export function StatsPanel() {
   }, [agents]);
 
   const stats = [
-    { label: "活跃", value: activeCount, color: "var(--lo-cyan)" },
-    { label: "待处理", value: pendingCount, color: "var(--lo-warn)" },
-    { label: "Cron", value: cronTasks.length, color: "var(--lo-violet)" },
+    { label: t("livingOffice.hud.statsActive"), value: activeCount, color: "var(--lo-cyan)" },
+    { label: t("livingOffice.hud.statsPending"), value: pendingCount, color: "var(--lo-warn)" },
+    { label: t("livingOffice.hud.statsCron"), value: cronTasks.length, color: "var(--lo-violet)" },
   ];
 
   return (
     <GlassCard
-      title="运行指标"
+      title={t("livingOffice.hud.statsTitle")}
       storageKey="lo-hud-stats"
+      defaultCollapsed
       collapsedContent={<CollapsedStats stats={stats} />}
     >
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>

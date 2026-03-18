@@ -3,8 +3,8 @@ export function BroadcastBeacon() {
     <div
       style={{
         position: "absolute",
-        left: 1090,
-        top: 245,
+        left: 1240,
+        top: 258,
         width: 30,
         height: 30,
         borderRadius: "50%",

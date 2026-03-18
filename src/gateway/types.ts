@@ -170,6 +170,10 @@ export interface VisualAgent {
   originalPosition: { x: number; y: number } | null;
   movement: MovementState | null;
   confirmed: boolean;
+  /** Timestamp when this sub-agent arrived at hotDesk zone (for minimum stay enforcement) */
+  arrivedAtHotDeskAt: number | null;
+  /** Whether lifecycle end has been received but retirement is deferred */
+  pendingRetire: boolean;
 }
 
 export interface ToolCallRecord {
@@ -287,10 +291,12 @@ export interface OfficeStore {
   updateAgent: (id: string, patch: Partial<VisualAgent>) => void;
   removeAgent: (id: string) => void;
   initAgents: (agents: AgentSummary[]) => void;
+  syncMainAgents: (agents: AgentSummary[]) => void;
 
   // Sub-Agent 管理
   addSubAgent: (parentId: string, info: SubAgentInfo) => void;
   removeSubAgent: (subAgentId: string) => void;
+  retireSubAgent: (subAgentId: string) => void;
 
   // 会议区位置管理
   moveToMeeting: (agentId: string, meetingPosition: { x: number; y: number }) => void;
@@ -312,6 +318,7 @@ export interface OfficeStore {
 
   // 事件处理
   processAgentEvent: (event: AgentEventPayload) => void;
+  deferredSetIdle: (agentId: string) => void;
   initEventHistory: () => Promise<void>;
 
   // UI actions

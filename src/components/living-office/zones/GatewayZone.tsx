@@ -1,16 +1,13 @@
-import { ZONE_CONFIGS, ZONE_LABEL_POSITIONS } from "../config";
+import { ZONE_CONFIGS } from "../config";
 import { GatewayCore } from "../panels/GatewayCore";
-import { ZoneLabel } from "./ZoneLabel";
 import { ZonePanel } from "./ZonePanel";
 
 export function GatewayZone() {
   const cfg = ZONE_CONFIGS.gateway;
-  const lbl = ZONE_LABEL_POSITIONS.gateway;
 
   return (
     <>
       <ZonePanel config={cfg} />
-      <ZoneLabel label={cfg.label} left={lbl.left} top={lbl.top} />
       <GatewayCore />
       <Conveyor />
     </>
@@ -22,9 +19,9 @@ function Conveyor() {
     <div
       style={{
         position: "absolute",
-        left: 74,
-        top: 275,
-        width: 356,
+        left: 48,
+        top: 258,
+        width: 404,
         height: 18,
         transform: "translateZ(6px)",
         overflow: "hidden",

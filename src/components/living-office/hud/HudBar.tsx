@@ -12,20 +12,20 @@ export function HudBar({ left, center, right }: HudBarProps) {
       className="lo-hud-bar"
       style={{
         position: "absolute",
-        top: 10,
-        left: 14,
-        right: 14,
+        top: 8,
+        left: 8,
+        right: 8,
         zIndex: 20,
         display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 10,
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
+        gap: 8,
         pointerEvents: "none",
         alignItems: "start",
       }}
     >
-      {left && <div style={{ pointerEvents: "auto" }}>{left}</div>}
-      {center && <div style={{ pointerEvents: "auto" }}>{center}</div>}
-      {right && <div style={{ pointerEvents: "auto" }}>{right}</div>}
+      {left && <div style={{ pointerEvents: "auto", minWidth: 0, overflow: "hidden" }}>{left}</div>}
+      {center && <div style={{ pointerEvents: "auto", minWidth: 0, overflow: "hidden" }}>{center}</div>}
+      {right && <div style={{ pointerEvents: "auto", minWidth: 0, overflow: "hidden" }}>{right}</div>}
     </div>
   );
 }

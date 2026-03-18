@@ -92,25 +92,34 @@ describe("office-store", () => {
       expect(agent?.toolCallCount).toBe(1);
     });
 
-    it("full lifecycle: idle → thinking → tool → speaking → idle", () => {
+    it("full lifecycle: idle → thinking → tool → speaking → idle (deferred)", () => {
+      vi.useFakeTimers({ shouldAdvanceTime: false });
+
       useOfficeStore.getState().initAgents([{ id: "a1", name: "Alpha" }]);
       setRunIdMap([["run-1", "a1"]]);
 
+      const now = Date.now();
       const events: AgentEventPayload[] = [
-        { runId: "run-1", seq: 1, stream: "lifecycle", ts: 1, data: { phase: "start" } },
-        { runId: "run-1", seq: 2, stream: "tool", ts: 2, data: { phase: "start", name: "web" } },
-        { runId: "run-1", seq: 3, stream: "tool", ts: 3, data: { phase: "end", name: "web" } },
-        { runId: "run-1", seq: 4, stream: "assistant", ts: 4, data: { text: "Done!" } },
-        { runId: "run-1", seq: 5, stream: "lifecycle", ts: 5, data: { phase: "end" } },
+        { runId: "run-1", seq: 1, stream: "lifecycle", ts: now, data: { phase: "start" } },
+        { runId: "run-1", seq: 2, stream: "tool", ts: now + 1, data: { phase: "start", name: "web" } },
+        { runId: "run-1", seq: 3, stream: "tool", ts: now + 2, data: { phase: "end", name: "web" } },
+        { runId: "run-1", seq: 4, stream: "assistant", ts: now + 3, data: { text: "Done!" } },
+        { runId: "run-1", seq: 5, stream: "lifecycle", ts: now + 4, data: { phase: "end" } },
       ];
 
-      const expectedStatuses = ["thinking", "tool_calling", "thinking", "speaking", "idle"];
-
+      const immediateStatuses = ["thinking", "tool_calling", "thinking", "speaking", "speaking"];
       for (let i = 0; i < events.length; i++) {
         useOfficeStore.getState().processAgentEvent(events[i]);
         const agent = useOfficeStore.getState().agents.get("a1");
-        expect(agent?.status).toBe(expectedStatuses[i]);
+        expect(agent?.status).toBe(immediateStatuses[i]);
       }
+
+      // After MIN_ACTIVE_DISPLAY_MS the deferred idle kicks in
+      vi.advanceTimersByTime(6_000);
+      const agent = useOfficeStore.getState().agents.get("a1");
+      expect(agent?.status).toBe("idle");
+
+      vi.useRealTimers();
     });
 
     it("creates unconfirmed agent for unknown runId in corridor zone", () => {

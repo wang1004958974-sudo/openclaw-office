@@ -147,7 +147,6 @@
   overflow: hidden;
   border: 1px solid var(--lo-line);
   box-shadow: var(--lo-shadow);
-  perspective: 1200px;
 }
 
 .dark .lo-world {
@@ -166,17 +165,17 @@
 
 .lo-office {
   position: absolute;
-  left: 52%;
-  top: 44%;
-  width: 1380px;
-  height: 820px;
-  transform: translate(-50%, -50%) scale(0.88) rotateX(50deg) rotateZ(-18deg);
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 920px;
+  transform: translate(-50%, -50%) scale(var(--lo-stage-scale, 0.92));
   transform-style: preserve-3d;
 }
 
 @media (max-width: 1400px) {
   .lo-office {
-    transform: translate(-50%, -50%) scale(0.72) rotateX(50deg) rotateZ(-18deg);
+    transform: translate(-50%, -50%) scale(var(--lo-stage-scale-sm, 0.72));
   }
 }
 
@@ -722,13 +721,21 @@
   }
 }
 
-/* HUD responsive: narrow viewport — keep side-by-side, just shrink gap */
+/* HUD responsive: narrow viewport */
 @media (max-width: 1400px) {
   .lo-hud-bar {
-    gap: 6px !important;
+    gap: 4px !important;
   }
 
   .lo-footer-bar {
-    gap: 6px !important;
+    gap: 4px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .lo-hud-bar {
+    gap: 3px !important;
+    left: 4px !important;
+    right: 4px !important;
   }
 }

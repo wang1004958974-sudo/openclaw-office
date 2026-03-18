@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { createServer, request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { readFileSync } from "node:fs";
 import { readFile, access } from "node:fs/promises";
 import { resolve, join, extname } from "node:path";
@@ -211,7 +212,8 @@ function proxyWsUpgrade(req, downstreamSocket, downstreamHead) {
     headers["sec-websocket-protocol"] = req.headers["sec-websocket-protocol"];
   }
 
-  const upstreamReq = httpRequest(upstreamUrl, { method: "GET", headers });
+  const doRequest = upstreamUrl.protocol === "https:" ? httpsRequest : httpRequest;
+  const upstreamReq = doRequest(upstreamUrl, { method: "GET", headers });
   let settled = false;
   let upgraded = false;
 

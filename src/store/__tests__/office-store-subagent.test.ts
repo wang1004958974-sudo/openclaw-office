@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import type { SubAgentInfo } from "@/gateway/types";
 import { useOfficeStore } from "@/store/office-store";
 
@@ -258,6 +258,92 @@ describe("processAgentEvent: real Gateway sub-agent sessionKey", () => {
     const main = useOfficeStore.getState().agents.get("main");
     expect(main?.isSubAgent).toBe(false);
     expect(main?.zone).toBe("desk");
+  });
+});
+
+describe("sub-agent retire: fast lifecycle end does not skip walk animation", () => {
+  beforeEach(() => {
+    resetStore();
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+    useOfficeStore.getState().initAgents([{ id: "main", name: "main" }]);
+    useOfficeStore.setState((state) => {
+      state.sessionKeyMap.set("agent:main:session-123", ["main"]);
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("retireSubAgent while still in lounge sends agent to hotDesk instead of removing", () => {
+    const { addSubAgent, retireSubAgent } = useOfficeStore.getState();
+    addSubAgent("main", mkSubInfo("fast-sub"));
+
+    const subBefore = useOfficeStore.getState().agents.get("fast-sub")!;
+    expect(subBefore.zone).toBe("lounge");
+
+    retireSubAgent("fast-sub");
+
+    const subAfter = useOfficeStore.getState().agents.get("fast-sub");
+    expect(subAfter).toBeDefined();
+    expect(subAfter!.pendingRetire).toBe(true);
+    expect(subAfter!.movement).not.toBeNull();
+    expect(subAfter!.movement!.toZone).toBe("hotDesk");
+  });
+
+  it("after arriving at hotDesk with pendingRetire, agent waits MIN_HOTDESK_STAY then walks to lounge", () => {
+    const { addSubAgent, retireSubAgent, completeMovement } = useOfficeStore.getState();
+    addSubAgent("main", mkSubInfo("wait-sub"));
+    retireSubAgent("wait-sub");
+
+    // Complete the walk to hotDesk
+    completeMovement("wait-sub");
+
+    const atHotDesk = useOfficeStore.getState().agents.get("wait-sub")!;
+    expect(atHotDesk.zone).toBe("hotDesk");
+    expect(atHotDesk.pendingRetire).toBe(true);
+    expect(atHotDesk.arrivedAtHotDeskAt).not.toBeNull();
+    // Should not yet be walking to lounge (min stay timer is pending)
+    expect(atHotDesk.movement).toBeNull();
+
+    // Advance time past MIN_HOTDESK_STAY_MS (10s)
+    vi.advanceTimersByTime(11_000);
+
+    const afterWait = useOfficeStore.getState().agents.get("wait-sub");
+    expect(afterWait).toBeDefined();
+    expect(afterWait!.movement).not.toBeNull();
+    expect(afterWait!.movement!.toZone).toBe("lounge");
+  });
+
+  it("rapid lifecycle start+end via processAgentEvent does not remove sub-agent instantly", () => {
+    const sessionKey = "agent:main:subagent:rapid-uuid";
+
+    // lifecycle start → creates sub-agent
+    useOfficeStore.getState().processAgentEvent({
+      runId: "run-rapid",
+      seq: 1,
+      stream: "lifecycle",
+      ts: Date.now(),
+      data: { phase: "start" },
+      sessionKey,
+    });
+
+    // lifecycle end → triggers retireSubAgent
+    useOfficeStore.getState().processAgentEvent({
+      runId: "run-rapid",
+      seq: 2,
+      stream: "lifecycle",
+      ts: Date.now(),
+      data: { phase: "end" },
+      sessionKey,
+    });
+
+    const sub = useOfficeStore.getState().agents.get("rapid-uuid");
+    expect(sub).toBeDefined();
+    expect(sub!.pendingRetire).toBe(true);
+    // Must still be walking to hotDesk (not removed)
+    expect(sub!.movement).not.toBeNull();
+    expect(sub!.movement!.toZone).toBe("hotDesk");
   });
 });
 

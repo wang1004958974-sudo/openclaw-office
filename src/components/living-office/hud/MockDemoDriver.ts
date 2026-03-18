@@ -363,14 +363,15 @@ export async function triggerIncident(engine: PerceptionEngine): Promise<void> {
 }
 
 /**
- * Demo scenarios with colored button configs
+ * Demo scenarios with colored button configs.
+ * `labelKey` is the i18n key under `office:livingOffice.demo.*`.
  */
 export const DEMO_BUTTONS = [
-  { label: "客户消息到达", fn: triggerUserTask, color: "rgba(59,130,246,0.8)", hoverColor: "rgba(59,130,246,1)" },
-  { label: "拉起协作", fn: triggerCollab, color: "rgba(139,92,246,0.8)", hoverColor: "rgba(139,92,246,1)" },
-  { label: "触发 Cron", fn: triggerCron, color: "rgba(245,158,11,0.8)", hoverColor: "rgba(245,158,11,1)" },
-  { label: "触发 Heartbeat", fn: triggerHeartbeat, color: "rgba(59,130,246,0.8)", hoverColor: "rgba(59,130,246,1)" },
-  { label: "制造阻塞", fn: triggerIncident, color: "rgba(239,68,68,0.8)", hoverColor: "rgba(239,68,68,1)" },
+  { labelKey: "userTask", fn: triggerUserTask, color: "rgba(59,130,246,0.8)", hoverColor: "rgba(59,130,246,1)" },
+  { labelKey: "collab", fn: triggerCollab, color: "rgba(139,92,246,0.8)", hoverColor: "rgba(139,92,246,1)" },
+  { labelKey: "cron", fn: triggerCron, color: "rgba(245,158,11,0.8)", hoverColor: "rgba(245,158,11,1)" },
+  { labelKey: "heartbeat", fn: triggerHeartbeat, color: "rgba(59,130,246,0.8)", hoverColor: "rgba(59,130,246,1)" },
+  { labelKey: "incident", fn: triggerIncident, color: "rgba(239,68,68,0.8)", hoverColor: "rgba(239,68,68,1)" },
 ] as const;
 
 /**

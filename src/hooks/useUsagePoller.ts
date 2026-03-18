@@ -21,6 +21,19 @@ interface UsageCostResponse {
   costs?: Record<string, number>;
 }
 
+interface SessionsUsageByAgentRow {
+  agentId?: string;
+  totals?: {
+    totalCost?: number;
+  };
+}
+
+interface SessionsUsageResponse {
+  aggregates?: {
+    byAgent?: SessionsUsageByAgentRow[];
+  };
+}
+
 export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const failureCountRef = useRef(0);
@@ -45,8 +58,9 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
       }
 
       try {
-        const [sessionsResp, costResp] = await Promise.all([
+        const [sessionsResp, sessionsUsageResp, costResp] = await Promise.all([
           rpc.request<SessionsListResponse>("sessions.list"),
+          rpc.request<SessionsUsageResponse>("sessions.usage").catch(() => null),
           rpc.request<UsageCostResponse>("usage.cost").catch(() => null),
         ]);
 
@@ -58,7 +72,8 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
           pushTokenSnapshot(snapshot);
         }
 
-        const costs = costResp?.byAgent ?? costResp?.costs ?? {};
+        const costs =
+          buildAgentCostsFromSessionsUsage(sessionsUsageResp) ?? costResp?.byAgent ?? costResp?.costs ?? {};
         if (Object.keys(costs).length > 0) {
           setAgentCosts(costs);
         }
@@ -120,6 +135,29 @@ export function buildSnapshotFromSessions(sessions: SessionTokenRow[]): TokenSna
 function extractAgentIdFromSessionKey(sessionKey: string | undefined): string | null {
   const match = /^agent:([^:]+):/.exec(sessionKey ?? "");
   return match?.[1] ?? null;
+}
+
+export function buildAgentCostsFromSessionsUsage(
+  response: SessionsUsageResponse | null | undefined,
+): Record<string, number> | null {
+  const rows = response?.aggregates?.byAgent;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+
+  const costs: Record<string, number> = {};
+  for (const row of rows) {
+    if (!row?.agentId) {
+      continue;
+    }
+    const totalCost = row.totals?.totalCost;
+    if (typeof totalCost !== "number" || !Number.isFinite(totalCost) || totalCost <= 0) {
+      continue;
+    }
+    costs[row.agentId] = totalCost;
+  }
+
+  return Object.keys(costs).length > 0 ? costs : null;
 }
 
 function estimateFromEventHistory(

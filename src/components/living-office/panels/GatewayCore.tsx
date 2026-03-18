@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "@/i18n";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 
 export function GatewayCore() {
+  const { t } = useTranslation("office");
   const [clock, setClock] = useState(() => formatTime());
   const connectionStatus = useOfficeStore((s) => s.connectionStatus);
   const operatorScopes = useOfficeStore((s) => s.operatorScopes);
@@ -16,19 +19,19 @@ export function GatewayCore() {
 
   const busLines = [
     {
-      title: "WebSocket",
+      title: t("livingOffice.panels.busWebSocket"),
       detail:
         gatewayStream.find((line) => line.label === "WebSocket")?.detail ??
         connectionStatus,
     },
     {
-      title: "Event Spine",
+      title: t("livingOffice.panels.busEventSpine"),
       detail:
         gatewayStream.find((line) => line.label === "Event Bus")?.detail ??
         `active ${globalMetrics.activeAgents}/${globalMetrics.totalAgents}`,
     },
     {
-      title: "RPC / Scope",
+      title: t("livingOffice.panels.busRpcScope"),
       detail:
         gatewayStream.find((line) => line.label === "RPC")?.detail ??
         (operatorScopes[0] ?? "operator"),
@@ -39,10 +42,10 @@ export function GatewayCore() {
     <div
       style={{
         position: "absolute",
-        left: 100,
-        top: 120,
-        width: 280,
-        height: 130,
+        left: 48,
+        top: 38,
+        width: 404,
+        height: 214,
         transform: "translateZ(20px)",
         borderRadius: 24,
         background:
@@ -74,7 +77,7 @@ export function GatewayCore() {
           position: "relative",
         }}
       >
-        <b style={{ fontSize: 15, color: "#e9f2ff" }}>OPENCLAW GATEWAY</b>
+        <b style={{ fontSize: 15, color: "#e9f2ff" }}>{t("livingOffice.panels.gatewayHeader")}</b>
         <span style={{ fontSize: 11, color: "var(--lo-muted)" }}>{clock}</span>
       </div>
 
@@ -114,5 +117,6 @@ export function GatewayCore() {
 }
 
 function formatTime(): string {
-  return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  const locale = i18n.language === "zh" ? "zh-CN" : "en-US";
+  return new Date().toLocaleTimeString(locale, { hour12: false });
 }

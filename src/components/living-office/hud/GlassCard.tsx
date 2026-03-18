@@ -28,7 +28,7 @@ function readCollapsed(key: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
-const COLLAPSED_H = 26;
+const COLLAPSED_H = 34;
 
 export function GlassCard({
   children,
@@ -71,6 +71,7 @@ export function GlassCard({
         minHeight: collapsed ? COLLAPSED_H : undefined,
         position: "relative",
         overflow: "hidden",
+        minWidth: 0,
         display: "flex",
         flexDirection: "column",
         transition: "padding 0.18s ease, border-radius 0.18s ease, height 0.18s ease",
@@ -135,7 +136,7 @@ export function GlassCard({
           {/* Title */}
           <span
             style={{
-              fontSize: collapsed ? 10 : 13,
+              fontSize: collapsed ? 11 : 13,
               fontWeight: 600,
               color: "var(--lo-text)",
               flexShrink: 0,

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 import { GlassPanel } from "./GlassPanel";
@@ -8,6 +9,7 @@ interface OpsBoardProps {
 }
 
 export function OpsBoard({ rules = [] }: OpsBoardProps) {
+  const { t } = useTranslation("office");
   const opsEvents = useProjectionStore((s) => s.sceneArea.opsRules);
   const agents = useOfficeStore((s) => s.agents);
   const links = useOfficeStore((s) => s.links);
@@ -18,14 +20,17 @@ export function OpsBoard({ rules = [] }: OpsBoardProps) {
   const activeSubAgents = Array.from(agents.values()).filter(
     (agent) => agent.isSubAgent && !agent.isPlaceholder,
   ).length;
+  const enabledLabel = agentToAgentConfig.enabled
+    ? t("livingOffice.panels.opsEnabled")
+    : t("livingOffice.panels.opsDisabled");
   const liveRules =
     opsEvents.length > 0
       ? opsEvents.slice(-4).reverse().map((entry) => `${entry.tag} · ${entry.text}`)
       : [
-        `error-agents · ${errorCount}`,
-        `collaboration-links · ${links.length}`,
-        `agent-to-agent · ${agentToAgentConfig.enabled ? "enabled" : "disabled"}`,
-        `sub-agent-capacity · ${activeSubAgents}/${maxSubAgents}`,
+        `${t("livingOffice.panels.opsErrorAgents")} · ${errorCount}`,
+        `${t("livingOffice.panels.opsCollabLinks")} · ${links.length}`,
+        `${t("livingOffice.panels.opsAgentToAgent")} · ${enabledLabel}`,
+        `${t("livingOffice.panels.opsSubCapacity")} · ${activeSubAgents}/${maxSubAgents}`,
       ];
   const displayRules = liveRules.length > 0 ? liveRules : rules;
 
@@ -33,14 +38,14 @@ export function OpsBoard({ rules = [] }: OpsBoardProps) {
     <GlassPanel
       style={{
         position: "absolute",
-        left: 480,
-        top: 100,
-        width: 390,
-        height: 154,
+        left: 508,
+        top: 38,
+        width: 504,
+        height: 214,
         transform: "translateZ(16px)",
       }}
     >
-      <PanelHead title="组织行为板" subtitle="因果链比热闹更重要" />
+      <PanelHead title={t("livingOffice.panels.opsTitle")} subtitle={t("livingOffice.panels.opsSubtitle")} />
       <div
         style={{
           display: "flex",
@@ -63,7 +68,7 @@ export function OpsBoard({ rules = [] }: OpsBoardProps) {
             }}
           >
             <span style={{ color: "#e6eefc" }}>{rule}</span>
-            <span style={{ color: "var(--lo-muted)" }}>live</span>
+            <span style={{ color: "var(--lo-muted)" }}>{t("livingOffice.panels.opsLive")}</span>
           </div>
         ))}
       </div>

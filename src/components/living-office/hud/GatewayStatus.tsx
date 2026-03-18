@@ -1,8 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 import { GlassCard } from "./GlassCard";
 
 function StatusBadge({ isOnline }: { isOnline: boolean }) {
+  const { t } = useTranslation("office");
+
   return (
     <div
       style={{
@@ -28,7 +31,7 @@ function StatusBadge({ isOnline }: { isOnline: boolean }) {
             : "0 0 6px rgba(255,102,122,0.6)",
         }}
       />
-      {isOnline ? "WS 在线" : "WS 断开"}
+      {isOnline ? t("livingOffice.hud.wsOnline") : t("livingOffice.hud.wsOffline")}
     </div>
   );
 }
@@ -66,6 +69,7 @@ function CollapsedStream({ lines }: { lines: { label: string; detail: string; ac
 }
 
 export function GatewayStatus() {
+  const { t } = useTranslation("office");
   const connectionStatus = useOfficeStore((s) => s.connectionStatus);
   const gatewayStream = useProjectionStore((s) => s.sceneArea.gatewayStream);
 
@@ -73,13 +77,14 @@ export function GatewayStatus() {
 
   return (
     <GlassCard
-      title="Gateway 中控大厅"
+      title={t("livingOffice.hud.gatewayTitle")}
       headerExtra={<StatusBadge isOnline={isOnline} />}
       storageKey="lo-hud-gateway"
+      defaultCollapsed
       collapsedContent={<CollapsedStream lines={gatewayStream} />}
     >
       <div style={{ fontSize: 10, color: "var(--lo-muted)", marginBottom: 6 }}>
-        接入事件、分发任务、协调全局
+        {t("livingOffice.hud.gatewaySubtitle")}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         {gatewayStream.map((line) => (

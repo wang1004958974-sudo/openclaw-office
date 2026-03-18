@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 import { GlassPanel } from "./GlassPanel";
@@ -8,9 +9,11 @@ interface ProjectRoomProps {
   tasks?: Array<{ title: string; subtitle: string }>;
 }
 
-const DEFAULT_TASKS = [{ title: "暂无临时协作", subtitle: "temporary workforce zone" }];
-
-export function ProjectRoom({ tasks = DEFAULT_TASKS }: ProjectRoomProps) {
+export function ProjectRoom({ tasks }: ProjectRoomProps) {
+  const { t } = useTranslation("office");
+  const defaultTasks = tasks ?? [
+    { title: t("livingOffice.panels.projectEmpty"), subtitle: t("livingOffice.panels.projectEmptySub") },
+  ];
   const lastSessionsSnapshot = useOfficeStore((s) => s.lastSessionsSnapshot);
   const projectedTasks = useProjectionStore((s) => s.sceneArea.projectTasks);
   const sessions = lastSessionsSnapshot?.sessions;
@@ -22,22 +25,22 @@ export function ProjectRoom({ tasks = DEFAULT_TASKS }: ProjectRoomProps) {
         }))
       : projectedTasks;
   const displayTasks = useMemo(
-    () => (liveTasks.length > 0 ? liveTasks : tasks),
-    [liveTasks, tasks],
+    () => (liveTasks.length > 0 ? liveTasks : defaultTasks),
+    [liveTasks, defaultTasks],
   );
 
   return (
     <GlassPanel
       style={{
         position: "absolute",
-        left: 990,
-        top: 360,
-        width: 220,
-        height: 150,
+        left: 1068,
+        top: 308,
+        width: 344,
+        height: 194,
         transform: "translateZ(16px)",
       }}
     >
-      <PanelHead title="临时项目室" subtitle="Sub-agent 只在这里亮起" />
+      <PanelHead title={t("livingOffice.panels.projectTitle")} subtitle={t("livingOffice.panels.projectSubtitle")} />
       <div
         style={{
           display: "flex",

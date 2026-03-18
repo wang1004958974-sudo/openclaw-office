@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
+import i18n from "@/i18n";
 import { useProjectionStore } from "@/perception/projection-store";
 import { useOfficeStore } from "@/store/office-store";
 import { useCronStore } from "@/store/console-stores/cron-store";
@@ -8,6 +9,8 @@ import { GatewayCore } from "../GatewayCore";
 import { MemoryWall } from "../MemoryWall";
 import { OpsBoard } from "../OpsBoard";
 import { ProjectRoom } from "../ProjectRoom";
+
+const t = (key: string) => i18n.t(`office:${key}`);
 
 describe("Living office canvas panels", () => {
   beforeEach(() => {
@@ -63,6 +66,16 @@ describe("Living office canvas panels", () => {
     expect(screen.getByText("gateway")).toBeInTheDocument();
   });
 
+  it("MemoryWall shows empty state instead of mock entries when there is no live data", () => {
+    render(
+      <div className="living-office">
+        <MemoryWall />
+      </div>,
+    );
+
+    expect(screen.getByText(t("livingOffice.panels.memoryEmpty"))).toBeInTheDocument();
+  });
+
   it("ProjectRoom renders live sub-agent sessions", () => {
     useOfficeStore.setState({
       lastSessionsSnapshot: {
@@ -95,7 +108,7 @@ describe("Living office canvas panels", () => {
       </div>,
     );
 
-    expect(screen.getByText("暂无临时协作")).toBeInTheDocument();
+    expect(screen.getByText(t("livingOffice.panels.projectEmpty"))).toBeInTheDocument();
   });
 
   it("OpsBoard renders live operational metrics when no incident log exists", () => {
@@ -105,8 +118,8 @@ describe("Living office canvas panels", () => {
       </div>,
     );
 
-    expect(screen.getByText("agent-to-agent · enabled")).toBeInTheDocument();
-    expect(screen.getByText("sub-agent-capacity · 0/8")).toBeInTheDocument();
+    expect(screen.getByText(`${t("livingOffice.panels.opsAgentToAgent")} · ${t("livingOffice.panels.opsEnabled")}`)).toBeInTheDocument();
+    expect(screen.getByText(`${t("livingOffice.panels.opsSubCapacity")} · 0/8`)).toBeInTheDocument();
   });
 
   it("GatewayCore renders live gateway stream details", () => {

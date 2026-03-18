@@ -1,20 +1,21 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useCronStore } from "@/store/console-stores/cron-store";
 import { GlassPanel } from "./GlassPanel";
 import { PanelHead } from "./PanelHead";
-
-const DEFAULT_CRON_TASKS = [
-  { name: "09:20 订单看板汇总", status: "scheduled" },
-  { name: "10:00 线索清洗广播", status: "scheduled" },
-  { name: "11:30 回款提醒", status: "scheduled" },
-];
 
 interface CronBoardProps {
   tasks?: Array<{ name: string; status: string }>;
 }
 
-export function CronBoard({ tasks = DEFAULT_CRON_TASKS }: CronBoardProps) {
+export function CronBoard({ tasks }: CronBoardProps) {
+  const { t } = useTranslation("office");
   const cronTasks = useCronStore((s) => s.tasks);
+  const defaultTasks = tasks ?? [
+    { name: "09:20 订单看板汇总", status: "scheduled" },
+    { name: "10:00 线索清洗广播", status: "scheduled" },
+    { name: "11:30 回款提醒", status: "scheduled" },
+  ];
   const liveTasks = useMemo(
     () =>
       cronTasks.map((task) => ({
@@ -27,20 +28,20 @@ export function CronBoard({ tasks = DEFAULT_CRON_TASKS }: CronBoardProps) {
       })),
     [cronTasks],
   );
-  const displayTasks = liveTasks.length > 0 ? liveTasks : tasks;
+  const displayTasks = liveTasks.length > 0 ? liveTasks : defaultTasks;
 
   return (
     <GlassPanel
       style={{
         position: "absolute",
-        left: 980,
-        top: 102,
-        width: 240,
-        height: 125,
+        left: 1068,
+        top: 38,
+        width: 344,
+        height: 214,
         transform: "translateZ(16px)",
       }}
     >
-      <PanelHead title="Cron 广播牌" subtitle="制度性任务，不拟人" />
+      <PanelHead title={t("livingOffice.panels.cronTitle")} subtitle={t("livingOffice.panels.cronSubtitle")} />
       <div
         style={{
           display: "flex",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isMockMode } from "@/gateway/adapter-provider";
 import { useProjectionStore } from "@/perception/projection-store";
 import type { AgentProjection } from "@/perception/types";
@@ -7,21 +7,19 @@ import { useCronStore } from "@/store/console-stores/cron-store";
 import { AgentCharacter2D5 } from "./characters/AgentCharacter2D5";
 import { SUB_AGENT_SLOTS } from "./characters/constants";
 import { SubAgentGhost, allocateSubAgentSlots } from "./characters/SubAgentGhost";
-import { DESK_CONFIGS } from "./config";
+import { DESK_CONFIGS, CANVAS_W, CANVAS_H } from "./config";
 import type { DeskConfig } from "./types";
-import { ControlPanel } from "./hud/ControlPanel";
 import { EventLogPanel } from "./hud/EventLogPanel";
-import { EventTicker } from "./hud/EventTicker";
-import { FooterBar } from "./hud/FooterBar";
 import { GatewayStatus } from "./hud/GatewayStatus";
 import { HudBar } from "./hud/HudBar";
-import { DEMO_BUTTONS, startAutoPlay } from "./hud/MockDemoDriver";
+import { startAutoPlay } from "./hud/MockDemoDriver";
 import { usePerceptionEngine } from "./hud/perception-context";
 import { StatsPanel } from "./hud/StatsPanel";
 import { OfficeStage } from "./scene/OfficeStage";
 import { Desk } from "./workspace/Desk";
 import { CronZone } from "./zones/CronZone";
 import { GatewayZone } from "./zones/GatewayZone";
+import { LoungeZone } from "./zones/LoungeZone";
 import { MemoryZone } from "./zones/MemoryZone";
 import { OpsZone } from "./zones/OpsZone";
 import { ProjectZone } from "./zones/ProjectZone";
@@ -47,11 +45,34 @@ interface DeskAssignment {
   agent: AgentProjection | undefined;
 }
 
-const STAFF_ZONE = { left: 86, top: 350, width: 820, height: 360 };
+const STAFF_ZONE = { left: 30, top: 290, width: 1000, height: 350 };
 const DESK_WIDTH = 160;
 const DESK_HEIGHT = 108;
 const DESK_GAP_X = 30;
 const DESK_GAP_Y = 50;
+
+function useStageScale(containerRef: React.RefObject<HTMLDivElement | null>): string {
+  const [scale, setScale] = useState("0.92");
+
+  const updateScale = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    const sx = width / CANVAS_W;
+    const sy = height / CANVAS_H;
+    const s = Math.min(sx, sy, 1.05);
+    setScale(s.toFixed(3));
+  }, [containerRef]);
+
+  useEffect(() => {
+    updateScale();
+    const ro = new ResizeObserver(updateScale);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [updateScale, containerRef]);
+
+  return scale;
+}
 
 function computeDynamicDeskConfigs(count: number): DeskConfig[] {
   if (count <= DESK_CONFIGS.length) {
@@ -95,7 +116,7 @@ function assignAgentsToDesks(agents: Map<string, AgentProjection>): DeskAssignme
       return {
         desk: {
           ...desk,
-          agentName: agent.agentId,
+          agentName: agent.role !== agent.agentId ? agent.role : agent.agentId,
           role: agent.role,
           status: agentStateToDeskStatus(agent.state),
         },
@@ -111,6 +132,8 @@ export function LivingOfficeView() {
   const connectionStatus = useOfficeStore((s) => s.connectionStatus);
   const engine = usePerceptionEngine();
   const autoPlayCleanup = useRef<(() => void) | null>(null);
+  const stageContainerRef = useRef<HTMLDivElement>(null);
+  const stageScale = useStageScale(stageContainerRef);
 
   const assignments = useMemo(() => assignAgentsToDesks(agents), [agents]);
 
@@ -121,7 +144,6 @@ export function LivingOfficeView() {
     subAgentEntries.map((a) => ({ agentId: a.agentId, name: a.role })),
   );
 
-  // Auto-play in mock mode
   useEffect(() => {
     if (!isMockMode() || !engine) return;
     autoPlayCleanup.current = startAutoPlay(engine);
@@ -130,18 +152,6 @@ export function LivingOfficeView() {
       autoPlayCleanup.current = null;
     };
   }, [engine]);
-
-  const demoButtons = useMemo(() => {
-    if (!engine) return [];
-    return DEMO_BUTTONS.map((btn) => ({
-      label: btn.label,
-      color: btn.color,
-      hoverColor: btn.hoverColor,
-      onClick: () => void btn.fn(engine),
-    }));
-  }, [engine]);
-
-  const handleNoop = useCallback(() => {}, []);
 
   useEffect(() => {
     if (!isMockMode() && connectionStatus !== "connected") {
@@ -188,17 +198,26 @@ export function LivingOfficeView() {
       {/* HUD Top Bar */}
       <HudBar
         left={<GatewayStatus />}
-        center={<EventTicker />}
+        center={<EventLogPanel />}
         right={<StatsPanel />}
       />
 
       {/* Main Stage */}
-      <div style={{ position: "absolute", inset: "46px 14px 46px 14px" }}>
+      <div
+        ref={stageContainerRef}
+        style={{
+          position: "absolute",
+          inset: "46px 8px 6px 8px",
+          "--lo-stage-scale": stageScale,
+          "--lo-stage-scale-sm": stageScale,
+        } as React.CSSProperties}
+      >
         <OfficeStage>
           <GatewayZone />
           <OpsZone />
           <CronZone />
           <StaffZone />
+          <LoungeZone />
           <ProjectZone />
           <MemoryZone />
 
@@ -216,7 +235,7 @@ export function LivingOfficeView() {
               key={`char-${desk.id}`}
               agentId={agent?.agentId ?? desk.id}
               deskId={desk.id}
-              name={agent?.agentId ?? desk.agentName}
+              name={agent?.role ?? desk.agentName}
               perceivedState={agent?.state ?? "IDLE"}
               toolName={agent?.tool}
             />
@@ -237,16 +256,6 @@ export function LivingOfficeView() {
           })}
         </OfficeStage>
       </div>
-
-      {/* Footer Bar */}
-      <FooterBar
-        left={<EventLogPanel />}
-        right={
-          <ControlPanel
-            buttons={demoButtons.length > 0 ? demoButtons : [{ label: "—", color: "#555", hoverColor: "#666", onClick: handleNoop }]}
-          />
-        }
-      />
     </div>
   );
 }

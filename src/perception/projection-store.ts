@@ -1,6 +1,7 @@
 import { enableMapSet } from "immer";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
+import i18n from "@/i18n";
 
 enableMapSet();
 
@@ -54,10 +55,10 @@ const SCENE_AREA_LIMIT = 5;
 function createDefaultSceneArea(): SceneAreaState {
   return {
     gatewayStream: [
-      { label: "WebSocket", detail: "连接中", active: false },
-      { label: "Event Bus", detail: "就绪", active: false },
-      { label: "RPC", detail: "就绪", active: false },
-      { label: "Health", detail: "正常", active: true },
+      { label: "WebSocket", detail: i18n.t("office:livingOffice.gateway.connecting"), active: false },
+      { label: "Event Bus", detail: i18n.t("office:livingOffice.gateway.ready"), active: false },
+      { label: "RPC", detail: i18n.t("office:livingOffice.gateway.ready"), active: false },
+      { label: "Health", detail: i18n.t("office:livingOffice.gateway.normal"), active: true },
     ],
     cronTasks: [],
     memoryItems: [],
@@ -155,7 +156,7 @@ function syncSceneAreaFromEvent(sceneArea: SceneAreaState, event: PerceivedEvent
   if (event.kind === "ARRIVE" || event.kind === "DISPATCH") {
     const webSocketLine = sceneArea.gatewayStream.find((line) => line.label === "WebSocket");
     if (webSocketLine) {
-      webSocketLine.detail = "实时事件中";
+      webSocketLine.detail = i18n.t("office:livingOffice.gateway.streaming");
       webSocketLine.active = true;
     }
 
@@ -175,7 +176,9 @@ function syncSceneAreaFromEvent(sceneArea: SceneAreaState, event: PerceivedEvent
   if (event.kind === "BLOCK" || event.kind === "RECOVER") {
     const healthLine = sceneArea.gatewayStream.find((line) => line.label === "Health");
     if (healthLine) {
-      healthLine.detail = event.kind === "BLOCK" ? "异常告警" : "恢复正常";
+      healthLine.detail = event.kind === "BLOCK"
+        ? i18n.t("office:livingOffice.gateway.alert")
+        : i18n.t("office:livingOffice.gateway.recovered");
       healthLine.active = event.kind !== "BLOCK";
     }
   }

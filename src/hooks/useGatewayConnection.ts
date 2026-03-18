@@ -29,6 +29,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
 
   const setConnectionStatus = useOfficeStore((s) => s.setConnectionStatus);
   const initAgents = useOfficeStore((s) => s.initAgents);
+  const syncMainAgents = useOfficeStore((s) => s.syncMainAgents);
   const processAgentEvent = useOfficeStore((s) => s.processAgentEvent);
   const setOperatorScopes = useOfficeStore((s) => s.setOperatorScopes);
   const setMaxSubAgents = useOfficeStore((s) => s.setMaxSubAgents);
@@ -78,6 +79,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
 
         // 3. Init agents (triggers prefillLoungePlaceholders with correct maxSubAgents)
         const agentList = await adapter.agentsList() as AgentsListResponse;
+        cacheAgentNames(agentList.agents);
         initAgents(agentList.agents);
         setOperatorScopes(["operator.admin"]);
         setConnectionStatus("connected");
@@ -128,6 +130,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
 
         void initAdapter("ws", { wsClient: ws, rpcClient: rpc });
         void fetchGatewayConfig(rpc, setMaxSubAgents, setAgentToAgentConfig);
+        void fetchAgentNamesAndUpdate(rpc, syncMainAgents);
       }
     });
 
@@ -141,7 +144,7 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
       const health = frame.payload as HealthSnapshot;
       if (health?.agents) {
         const summaries = healthAgentsToSummaries(health);
-        initAgents(summaries);
+        syncMainAgents(summaries);
       }
     });
 
@@ -156,12 +159,27 @@ export function useGatewayConnection({ url, token }: UseGatewayConnectionOptions
       throttleRef.current = null;
       perceptionRef.current = null;
     };
-  }, [url, token, setConnectionStatus, initAgents, processAgentEvent, setOperatorScopes, setMaxSubAgents, setAgentToAgentConfig]);
+  }, [url, token, setConnectionStatus, initAgents, syncMainAgents, processAgentEvent, setOperatorScopes, setMaxSubAgents, setAgentToAgentConfig]);
 
   useSubAgentPoller(rpcRef);
   useUsagePoller(rpcRef);
 
   return { wsClient: wsRef, rpcClient: rpcRef, perceptionEngine: perceptionRef };
+}
+
+const agentNameCache = new Map<string, { name: string; identity?: AgentSummary["identity"] }>();
+
+function cacheAgentNames(agents: AgentSummary[]): void {
+  for (const a of agents) {
+    agentNameCache.set(a.id, {
+      name: a.identity?.name ?? a.name ?? a.id,
+      identity: a.identity,
+    });
+  }
+}
+
+function resolveAgentName(agentId: string): string {
+  return agentNameCache.get(agentId)?.name ?? agentId;
 }
 
 function healthAgentsToSummaries(health: HealthSnapshot): AgentSummary[] {
@@ -170,7 +188,8 @@ function healthAgentsToSummaries(health: HealthSnapshot): AgentSummary[] {
   }
   return health.agents.map((a) => ({
     id: a.agentId,
-    name: a.agentId,
+    name: resolveAgentName(a.agentId),
+    identity: agentNameCache.get(a.agentId)?.identity,
   }));
 }
 
@@ -191,7 +210,7 @@ function initProjectionFromSnapshot(ws: GatewayWsClient): void {
   if (health?.agents) {
     const batch = health.agents.map((a) => ({
       agentId: a.agentId,
-      role: a.agentId,
+      role: resolveAgentName(a.agentId),
       deskId: a.agentId,
     }));
     useProjectionStore.getState().initAgentsBatch(batch);
@@ -200,6 +219,27 @@ function initProjectionFromSnapshot(ws: GatewayWsClient): void {
 
 interface ConfigGetResponse {
   value?: unknown;
+}
+
+async function fetchAgentNamesAndUpdate(
+  rpc: GatewayRpcClient,
+  syncMainAgents: (agents: AgentSummary[]) => void,
+): Promise<void> {
+  try {
+    const result = await rpc.request<AgentsListResponse>("agents.list");
+    if (result?.agents) {
+      cacheAgentNames(result.agents);
+      syncMainAgents(result.agents);
+      const batch = result.agents.map((a) => ({
+        agentId: a.id,
+        role: a.identity?.name ?? a.name ?? a.id,
+        deskId: a.id,
+      }));
+      useProjectionStore.getState().initAgentsBatch(batch);
+    }
+  } catch {
+    // agents.list not available yet, snapshot data will be used
+  }
 }
 
 async function fetchGatewayConfig(
