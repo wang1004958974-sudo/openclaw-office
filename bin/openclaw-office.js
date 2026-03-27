@@ -2,8 +2,8 @@
 
 import { createServer, request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { readFileSync } from "node:fs";
-import { readFile, access } from "node:fs/promises";
+import { readFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFile, writeFile, access, readdir, unlink, mkdir } from "node:fs/promises";
 import { resolve, join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { networkInterfaces, homedir } from "node:os";
@@ -286,9 +286,287 @@ function proxyWsUpgrade(req, downstreamSocket, downstreamHead) {
   upstreamReq.end();
 }
 
+// --- Chat history file-based cache (per-day sharded) ---
+//
+// Directory layout:
+//   ~/.openclaw/office-cache/chat/
+//     _sessions.json                         — session list index
+//     {safe-session-key}/                    — one dir per session
+//       _meta.json                           — { sessionKey, agentId, cachedAt }
+//       2026-03-27.json                      — messages for that day
+//       2026-03-26.json
+//       ...
+//
+// On read  → scan all day-files in the session dir, merge & sort by timestamp
+// On write → only append/overwrite the current-day file with today's messages
+
+const CHAT_CACHE_DIR = join(homedir(), ".openclaw", "office-cache", "chat");
+const SESSIONS_FILE = join(CHAT_CACHE_DIR, "_sessions.json");
+const MAX_DAY_FILES = 90;
+
+function ensureCacheDir() {
+  if (!existsSync(CHAT_CACHE_DIR)) {
+    mkdirSync(CHAT_CACHE_DIR, { recursive: true });
+  }
+}
+
+ensureCacheDir();
+
+function safeSessionDirName(sessionKey) {
+  return sessionKey.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+function todayDateString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dateStringFromTimestamp(ts) {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function isDayFile(name) {
+  return /^\d{4}-\d{2}-\d{2}\.json$/u.test(name);
+}
+
+async function readJsonFile(filePath) {
+  try {
+    await access(filePath);
+    const raw = await readFile(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+async function writeJsonFile(filePath, data) {
+  await writeFile(filePath, JSON.stringify(data), "utf-8");
+}
+
+async function ensureDir(dir) {
+  try {
+    await mkdir(dir, { recursive: true });
+  } catch { /* already exists */ }
+}
+
+async function safeReaddir(dir) {
+  try {
+    return await readdir(dir);
+  } catch {
+    return [];
+  }
+}
+
+async function readSessionMessages(sessionDir) {
+  const files = await safeReaddir(sessionDir);
+  const dayFiles = files.filter(isDayFile).sort();
+  const allMessages = [];
+  for (const file of dayFiles) {
+    const data = await readJsonFile(join(sessionDir, file));
+    if (Array.isArray(data)) {
+      allMessages.push(...data);
+    }
+  }
+  allMessages.sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
+  return allMessages;
+}
+
+async function writeSessionMessages(sessionDir, sessionKey, agentId, messages) {
+  await ensureDir(sessionDir);
+
+  // Write meta
+  await writeJsonFile(join(sessionDir, "_meta.json"), {
+    sessionKey,
+    agentId,
+    cachedAt: Date.now(),
+    messageCount: messages.length,
+  });
+
+  // Group messages by day
+  const byDay = new Map();
+  for (const msg of messages) {
+    const day = dateStringFromTimestamp(msg.timestamp ?? Date.now());
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(msg);
+  }
+
+  // Write each day file
+  for (const [day, dayMsgs] of byDay) {
+    await writeJsonFile(join(sessionDir, `${day}.json`), dayMsgs);
+  }
+
+  // Prune old day files beyond MAX_DAY_FILES
+  const files = await safeReaddir(sessionDir);
+  const dayFiles = files.filter(isDayFile).sort();
+  if (dayFiles.length > MAX_DAY_FILES) {
+    const toRemove = dayFiles.slice(0, dayFiles.length - MAX_DAY_FILES);
+    for (const file of toRemove) {
+      try { await unlink(join(sessionDir, file)); } catch { /* ok */ }
+    }
+  }
+}
+
+async function deleteSessionDir(sessionDir) {
+  const files = await safeReaddir(sessionDir);
+  for (const file of files) {
+    try { await unlink(join(sessionDir, file)); } catch { /* ok */ }
+  }
+  try {
+    const { rmdir } = await import("node:fs/promises");
+    await rmdir(sessionDir);
+  } catch { /* ok */ }
+}
+
+function sendJson(res, statusCode, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  });
+  res.end(body);
+}
+
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      try {
+        const raw = Buffer.concat(chunks).toString("utf-8");
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (err) {
+        reject(err);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+async function handleChatCacheApi(req, res, pathname) {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    });
+    res.end();
+    return true;
+  }
+
+  // GET /api/chat-cache/sessions
+  if (pathname === "/api/chat-cache/sessions" && req.method === "GET") {
+    const data = await readJsonFile(SESSIONS_FILE);
+    sendJson(res, 200, { sessions: data?.sessions ?? [], cachedAt: data?.cachedAt ?? null });
+    return true;
+  }
+
+  // PUT /api/chat-cache/sessions
+  if (pathname === "/api/chat-cache/sessions" && req.method === "PUT") {
+    const body = await readRequestBody(req);
+    const sessions = Array.isArray(body.sessions) ? body.sessions : [];
+    await writeJsonFile(SESSIONS_FILE, { sessions, cachedAt: Date.now() });
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  // GET /api/chat-cache/messages?sessionKey=xxx
+  if (pathname === "/api/chat-cache/messages" && req.method === "GET") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const sessionKey = url.searchParams.get("sessionKey");
+    if (!sessionKey) {
+      sendJson(res, 400, { error: "Missing sessionKey" });
+      return true;
+    }
+    const sessionDir = join(CHAT_CACHE_DIR, safeSessionDirName(sessionKey));
+    const meta = await readJsonFile(join(sessionDir, "_meta.json"));
+    const messages = await readSessionMessages(sessionDir);
+    sendJson(res, 200, {
+      messages,
+      sessionKey: meta?.sessionKey ?? sessionKey,
+      agentId: meta?.agentId ?? null,
+      cachedAt: meta?.cachedAt ?? null,
+    });
+    return true;
+  }
+
+  // PUT /api/chat-cache/messages
+  if (pathname === "/api/chat-cache/messages" && req.method === "PUT") {
+    const body = await readRequestBody(req);
+    const sessionKey = body.sessionKey;
+    if (!sessionKey || typeof sessionKey !== "string") {
+      sendJson(res, 400, { error: "Missing sessionKey" });
+      return true;
+    }
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const agentId = body.agentId ?? null;
+    const sessionDir = join(CHAT_CACHE_DIR, safeSessionDirName(sessionKey));
+    await writeSessionMessages(sessionDir, sessionKey, agentId, messages);
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  // GET /api/chat-cache/all-messages
+  if (pathname === "/api/chat-cache/all-messages" && req.method === "GET") {
+    ensureCacheDir();
+    const entries = await safeReaddir(CHAT_CACHE_DIR);
+    const result = [];
+    for (const entry of entries) {
+      if (entry.startsWith("_") || entry.endsWith(".json")) continue;
+      const sessionDir = join(CHAT_CACHE_DIR, entry);
+      const meta = await readJsonFile(join(sessionDir, "_meta.json"));
+      if (meta?.sessionKey) {
+        result.push({
+          sessionKey: meta.sessionKey,
+          agentId: meta.agentId ?? null,
+          messageCount: meta.messageCount ?? 0,
+          cachedAt: meta.cachedAt ?? null,
+        });
+      }
+    }
+    sendJson(res, 200, { sessions: result });
+    return true;
+  }
+
+  // DELETE /api/chat-cache/messages?sessionKey=xxx
+  if (pathname === "/api/chat-cache/messages" && req.method === "DELETE") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const sessionKey = url.searchParams.get("sessionKey");
+    if (!sessionKey) {
+      sendJson(res, 400, { error: "Missing sessionKey" });
+      return true;
+    }
+    const sessionDir = join(CHAT_CACHE_DIR, safeSessionDirName(sessionKey));
+    await deleteSessionDir(sessionDir);
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  return false;
+}
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   const pathname = decodeURIComponent(url.pathname);
+
+  // Chat cache REST API
+  if (pathname.startsWith("/api/chat-cache/")) {
+    try {
+      const handled = await handleChatCacheApi(req, res, pathname);
+      if (handled) return;
+    } catch (err) {
+      sendJson(res, 500, { error: String(err) });
+      return;
+    }
+  }
 
   // Serve injected index.html for root and SPA routes
   if (pathname === "/" || pathname === "/index.html") {

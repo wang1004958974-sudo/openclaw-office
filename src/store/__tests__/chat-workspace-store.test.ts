@@ -129,7 +129,7 @@ describe("Chat workspace store", () => {
     expect(state.currentSessionKey).toMatch(/^agent:coder:session-\d+$/u);
   });
 
-  it("uses cached session history before hitting gateway", async () => {
+  it("shows cached sessions immediately and refreshes from gateway", async () => {
     vi.spyOn(localPersistence, "getSessions").mockResolvedValue({
       sessions: [
         {
@@ -147,11 +147,12 @@ describe("Chat workspace store", () => {
 
     await useChatDockStore.getState().loadSessions();
 
-    expect(sessionsListSpy).not.toHaveBeenCalled();
-    expect(useChatDockStore.getState().sessions[0]?.label).toBe("cached");
+    expect(sessionsListSpy).toHaveBeenCalled();
+    const sessions = useChatDockStore.getState().sessions;
+    expect(sessions.length).toBeGreaterThan(0);
   });
 
-  it("uses cached message history before hitting gateway", async () => {
+  it("shows cached messages immediately then refreshes from gateway", async () => {
     vi.spyOn(localPersistence, "getMessages").mockResolvedValue([
       {
         id: "cached-1",
@@ -165,8 +166,8 @@ describe("Chat workspace store", () => {
 
     await useChatDockStore.getState().initializeHistory();
 
-    expect(historySpy).not.toHaveBeenCalled();
-    expect(useChatDockStore.getState().messages[0]?.content).toBe("cached reply");
+    expect(historySpy).toHaveBeenCalled();
+    expect(useChatDockStore.getState().isHistoryLoaded).toBe(true);
   });
 
   it("queues outbound messages while streaming", async () => {

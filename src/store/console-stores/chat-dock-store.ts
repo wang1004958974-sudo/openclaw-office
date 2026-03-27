@@ -14,6 +14,7 @@ import { exportChatTranscriptMarkdown } from "@/lib/chat-export";
 import { buildSlashHelpText, parseSlashCommand } from "@/lib/chat-slash-commands";
 import { localPersistence } from "@/lib/local-persistence";
 import { generateMessageId } from "@/lib/message-utils";
+import { serverPersistence } from "@/lib/server-persistence";
 
 export type MessageRole = "user" | "assistant" | "system";
 export type ChatMessageKind = "message" | "tool" | "command";
@@ -93,7 +94,6 @@ function buildSessionKey(agentId: string): string {
   return `agent:${agentId}:main`;
 }
 
-const SESSION_LIST_CACHE_MAX_AGE_MS = 60_000;
 const CHAT_PAGE_LAST_SESSION_KEY = "openclaw-office-chat-page:last-session";
 
 function isWorkspaceChatSessionKey(sessionKey: string): boolean {
@@ -199,6 +199,7 @@ function touchSession(
 
 function persistSessions(sessions: SessionInfo[]): void {
   void localPersistence.saveSessions(sessions);
+  serverPersistence.saveSessions(sessions);
 }
 
 function extractText(content: unknown): string {
@@ -645,6 +646,7 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
     }));
 
     localPersistence.saveMessage(currentSessionKey, userMsg).catch(() => {});
+    serverPersistence.saveMessages(currentSessionKey, get().messages, get().targetAgentId);
     persistSessions(nextSessions);
 
     try {
@@ -741,17 +743,26 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
 
   loadSessions: async () => {
     const current = get();
-    const cached = await localPersistence.getSessions();
-    if (cached.sessions.length > 0) {
-      const normalizedCached = filterWorkspaceSessions(cached.sessions.map(normalizeSession));
+
+    // Layer 1: Server file cache (fast, persistent)
+    const serverCached = await serverPersistence.getSessions();
+    if (serverCached.sessions.length > 0) {
+      const normalizedServer = filterWorkspaceSessions(serverCached.sessions.map(normalizeSession));
       set({
-        sessions: mergeCurrentSession(normalizedCached, current.currentSessionKey, current.targetAgentId),
+        sessions: mergeCurrentSession(normalizedServer, current.currentSessionKey, current.targetAgentId),
       });
-      if (cached.cachedAt && Date.now() - cached.cachedAt < SESSION_LIST_CACHE_MAX_AGE_MS) {
-        return;
+    } else {
+      // Layer 2: IndexedDB fallback
+      const idbCached = await localPersistence.getSessions();
+      if (idbCached.sessions.length > 0) {
+        const normalizedIdb = filterWorkspaceSessions(idbCached.sessions.map(normalizeSession));
+        set({
+          sessions: mergeCurrentSession(normalizedIdb, current.currentSessionKey, current.targetAgentId),
+        });
       }
     }
 
+    // Layer 3: Always fetch fresh from Gateway in background
     try {
       const result = await withAdapter((adapter) => adapter.sessionsList());
       const normalized = filterWorkspaceSessions(result.map(normalizeSession));
@@ -775,6 +786,7 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
       const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, messages.length);
       set({ messages, thinkingLevel: result.thinkingLevel ?? null, sessions: nextSessions });
       await localPersistence.saveMessages(currentSessionKey, messages);
+      serverPersistence.saveMessagesImmediate(currentSessionKey, messages, authorAgentId);
       persistSessions(nextSessions);
     } catch {
       set({ messages: [] });
@@ -784,56 +796,93 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
   initializeHistory: async () => {
     const { currentSessionKey } = get();
     set({ isHistoryLoading: true });
+
+    let cacheHit = false;
+    const authorAgentId = resolveSessionAgentId(currentSessionKey, get().sessions) ?? get().targetAgentId;
+
+    // Layer 1: Server file cache (persistent across browser reloads/devices)
     try {
-      const cached = await localPersistence.getMessages(currentSessionKey);
-      if (cached.length > 0) {
-        const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, cached.length);
+      const serverCached = await serverPersistence.getMessages(currentSessionKey);
+      if (serverCached.length > 0) {
+        const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, serverCached.length);
         set({
-          messages: cached,
+          messages: serverCached,
           sessions: nextSessions,
           isHistoryLoaded: true,
           isHistoryLoading: false,
         });
         persistSessions(nextSessions);
-        return;
+        void localPersistence.saveMessages(currentSessionKey, serverCached);
+        cacheHit = true;
       }
+    } catch {
+      // Server cache unavailable, fall through.
+    }
 
-      const activeSession = get().sessions.find((session) => session.key === currentSessionKey);
-      if (activeSession && (activeSession.messageCount ?? 0) === 0) {
+    // Layer 2: IndexedDB fallback (if server cache missed)
+    if (!cacheHit) {
+      try {
+        const idbCached = await localPersistence.getMessages(currentSessionKey);
+        if (idbCached.length > 0) {
+          const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, idbCached.length);
+          set({
+            messages: idbCached,
+            sessions: nextSessions,
+            isHistoryLoaded: true,
+            isHistoryLoading: false,
+          });
+          persistSessions(nextSessions);
+          serverPersistence.saveMessagesImmediate(currentSessionKey, idbCached, authorAgentId);
+          cacheHit = true;
+        }
+      } catch {
+        // IndexedDB unavailable.
+      }
+    }
+
+    // Layer 3: Gateway RPC fetch — always run to ensure we have the latest data
+    try {
+      const result: ChatHistoryResult = await withAdapter((adapter) =>
+        adapter.chatHistory(currentSessionKey),
+      );
+      const gatewayMessages = normalizeHistoryMessages(
+        result.messages as unknown as Record<string, unknown>[],
+        authorAgentId,
+      );
+
+      if (gatewayMessages.length > 0) {
+        const currentMessages = get().messages;
+        const shouldUpdate = !cacheHit || gatewayMessages.length !== currentMessages.length;
+        if (shouldUpdate) {
+          const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, gatewayMessages.length);
+          set({
+            messages: gatewayMessages,
+            sessions: nextSessions,
+            isHistoryLoaded: true,
+            isHistoryLoading: false,
+            thinkingLevel: result.thinkingLevel ?? null,
+          });
+          persistSessions(nextSessions);
+        }
+        void localPersistence.saveMessages(currentSessionKey, gatewayMessages);
+        serverPersistence.saveMessagesImmediate(currentSessionKey, gatewayMessages, authorAgentId);
+      } else if (!cacheHit) {
+        const activeSession = get().sessions.find((session) => session.key === currentSessionKey);
         set({
           messages: [],
           isHistoryLoaded: true,
           isHistoryLoading: false,
-          thinkingLevel: activeSession?.thinkingLevel ?? null,
+          thinkingLevel: activeSession?.thinkingLevel ?? result.thinkingLevel ?? null,
         });
-        return;
       }
-
-      const result: ChatHistoryResult = await withAdapter((adapter) =>
-        adapter.chatHistory(currentSessionKey),
-      );
-      const authorAgentId = resolveSessionAgentId(currentSessionKey, get().sessions) ?? get().targetAgentId;
-      const messages = normalizeHistoryMessages(
-        result.messages as unknown as Record<string, unknown>[],
-        authorAgentId,
-      );
-      const nextSessions = touchSession(get().sessions, currentSessionKey, get().targetAgentId, messages.length);
-      set({
-        messages,
-        sessions: nextSessions,
-        isHistoryLoaded: true,
-        isHistoryLoading: false,
-        thinkingLevel: result.thinkingLevel ?? null,
-      });
-      await localPersistence.saveMessages(currentSessionKey, messages);
-      persistSessions(nextSessions);
     } catch {
-      try {
-        const cached = await localPersistence.getMessages(currentSessionKey);
-        set({ messages: cached, isHistoryLoaded: true, isHistoryLoading: false });
-      } catch {
+      if (!cacheHit) {
         set({ messages: [], isHistoryLoaded: true, isHistoryLoading: false });
       }
+    }
+
+    if (!get().isHistoryLoaded) {
+      set({ isHistoryLoaded: true, isHistoryLoading: false });
     }
   },
 
@@ -922,8 +971,9 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
             streamingMessage: null,
             activeRunId: null,
           }));
-          const { currentSessionKey, messages } = get();
+          const { currentSessionKey, messages, targetAgentId: agentId } = get();
           void localPersistence.saveMessages(currentSessionKey, messages);
+          serverPersistence.saveMessagesImmediate(currentSessionKey, messages, agentId);
           persistSessions(nextSessions);
         } else {
           set({
@@ -1053,7 +1103,9 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
         streamingMessage: phase === "start" ? null : state.streamingMessage,
       };
     });
-    void localPersistence.saveMessages(get().currentSessionKey, get().messages);
+    const { currentSessionKey: sk, messages: msgs, targetAgentId: aid } = get();
+    void localPersistence.saveMessages(sk, msgs);
+    serverPersistence.saveMessages(sk, msgs, aid);
   },
 
   clearError: () => set({ error: null }),
@@ -1093,6 +1145,7 @@ export const useChatDockStore = create<ChatDockState>((set, get) => ({
     const { currentSessionKey } = get();
     set({ messages: [] });
     await localPersistence.clearMessages(currentSessionKey);
+    void serverPersistence.clearMessages(currentSessionKey);
   },
 
   setFocusMode: (focusMode) => set({ focusMode }),
