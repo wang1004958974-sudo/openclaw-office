@@ -219,9 +219,9 @@ Gateway 广播实时事件（`agent`、`presence`、`health`、`heartbeat`）并
 
 ## 微信交流群
 
-**微信养虾技术交流群**：欢迎扫码加群，与大家一起交流养虾实践、技术心得与常见问题。具体入群与群规以群内说明为准。
+**微信养虾技术交流群**：欢迎扫码加群，与大家一起交流养虾实践、技术心得与实际真实的业务应用等。
 
-<img src="./assets/weixin.png" alt="微信养虾技术交流群二维码" width="200" height="200" />
+<img src="./assets/weixin.png" alt="微信养虾技术交流群二维码" width="300" />
 
 ---
 
