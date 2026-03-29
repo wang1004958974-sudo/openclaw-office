@@ -918,6 +918,31 @@ export class MockAdapter implements GatewayAdapter {
     };
   }
 
+  async usageCost(): Promise<Record<string, unknown>> {
+    return {
+      totalCost: 20.37,
+      totalTokens: 49200000,
+      latestDay: { date: "2026-03-28", cost: 20.37, totalTokens: 43000000 },
+    };
+  }
+
+  async sessionsUsage(): Promise<Record<string, unknown>> {
+    return {
+      aggregates: {
+        byProvider: [
+          { provider: "openai-codex", count: 12, totals: { totalCost: 12.34, totalTokens: 21000000 } },
+          { provider: "google-gemini-cli", count: 8, totals: { totalCost: 0, totalTokens: 22000000 } },
+          { provider: "deepseek", count: 4, totals: { totalCost: 8.03, totalTokens: 6200000 } },
+        ],
+        byModel: [
+          { provider: "openai-codex", model: "gpt-5-codex", count: 10, totals: { totalCost: 12.34, totalTokens: 21000000 } },
+          { provider: "google-gemini-cli", model: "gemini-2.5-pro", count: 5, totals: { totalCost: 0, totalTokens: 18000000 } },
+          { provider: "deepseek", model: "deepseek-chat", count: 4, totals: { totalCost: 8.03, totalTokens: 6200000 } },
+        ],
+      },
+    };
+  }
+
   async usageStatus(): Promise<UsageInfo> {
     return {
       updatedAt: Date.now(),

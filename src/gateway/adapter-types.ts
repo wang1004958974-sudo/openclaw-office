@@ -243,6 +243,43 @@ export interface UsageProviderWindow {
   resetAt?: number;
 }
 
+export interface UsageLimitWindow {
+  key: string;
+  label: string;
+  used?: number;
+  limit?: number;
+  remaining?: number;
+  unit?: "usd" | "tokens" | "requests" | "credits" | "mixed";
+  usedPercent?: number;
+  resetAt?: number;
+  source?: "api" | "derived" | "manual-max" | "unavailable";
+}
+
+export interface AiAccountUsageInfo {
+  accountId: string;
+  accountLabel: string;
+  provider: string;
+  providerDisplayName: string;
+  source?: "auth" | "provider";
+  plan?: string;
+  authType?: "apiKey" | "oauth" | "session" | "token" | "unknown";
+  status?: "ok" | "warning" | "error" | "unknown";
+  identityHint?: string;
+  email?: string;
+  baseUrl?: string;
+  api?: string;
+  quotaMode?: "official" | "local" | "manual" | "unavailable";
+  costState?: "ok" | "pricing-mismatch" | "unavailable";
+  estimatedCost?: number;
+  estimatedTokens?: number;
+  missingCostEntries?: number;
+  topModels?: Array<{ model: string; cost?: number; tokens?: number; missingCostEntries?: number }>;
+  windows: UsageLimitWindow[];
+  lastCheckedAt?: number;
+  error?: string;
+  modelCount?: number;
+}
+
 export interface UsageProviderInfo {
   provider: string;
   displayName: string;
@@ -254,6 +291,7 @@ export interface UsageProviderInfo {
 export interface UsageInfo {
   updatedAt: number;
   providers: UsageProviderInfo[];
+  accounts?: AiAccountUsageInfo[];
 }
 
 export interface SkillInstallResult {

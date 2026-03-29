@@ -10,6 +10,7 @@ import { DashboardPage } from "@/components/pages/DashboardPage";
 import { ChatPage } from "@/components/pages/ChatPage";
 import { SettingsPage } from "@/components/pages/SettingsPage";
 import { SkillsPage } from "@/components/pages/SkillsPage";
+import { AiAccountsPage } from "@/components/pages/AiAccountsPage";
 import { ChatWorkspaceBootstrap } from "@/components/chat/ChatWorkspaceBootstrap";
 import type { PageId } from "@/gateway/types";
 import { useGatewayConnection } from "@/hooks/useGatewayConnection";
@@ -39,6 +40,7 @@ const PAGE_MAP: Record<string, PageId> = {
   "/channels": "channels",
   "/skills": "skills",
   "/cron": "cron",
+  "/ai-accounts": "aiAccounts",
   "/settings": "settings",
 };
 
@@ -98,6 +100,7 @@ export function App() {
           <Route path="/channels" element={<ChannelsPage />} />
           <Route path="/skills" element={<SkillsPage />} />
           <Route path="/cron" element={<CronPage />} />
+          <Route path="/ai-accounts" element={<AiAccountsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

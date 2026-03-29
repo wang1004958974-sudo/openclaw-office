@@ -281,6 +281,14 @@ export class WsAdapter implements GatewayAdapter {
     return this.rpcClient.request<UsageInfo>("usage.status");
   }
 
+  async usageCost(params?: { days?: number; startDate?: string; endDate?: string; mode?: string; utcOffset?: number }): Promise<Record<string, unknown>> {
+    return this.rpcClient.request<Record<string, unknown>>("usage.cost", params ?? {});
+  }
+
+  async sessionsUsage(params?: { limit?: number; startDate?: string; endDate?: string; mode?: string; utcOffset?: number }): Promise<Record<string, unknown>> {
+    return this.rpcClient.request<Record<string, unknown>>("sessions.usage", params ?? {});
+  }
+
   async modelsList(): Promise<ModelCatalogEntry[]> {
     const result = await this.rpcClient.request<{ models: ModelCatalogEntry[] }>("models.list");
     return result.models ?? [];
