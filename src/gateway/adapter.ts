@@ -88,6 +88,8 @@ export interface GatewayAdapter {
   agentsFilesSet(agentId: string, name: string, content: string): Promise<AgentFileSetResult>;
   toolsCatalog(agentId?: string): Promise<ToolCatalog>;
   usageStatus(): Promise<UsageInfo>;
+  usageCost(params?: { days?: number; startDate?: string; endDate?: string; mode?: string; utcOffset?: number }): Promise<Record<string, unknown>>;
+  sessionsUsage(params?: { limit?: number; startDate?: string; endDate?: string; mode?: string; utcOffset?: number }): Promise<Record<string, unknown>>;
 
   // Models catalog (from pi-ai SDK auto-discovery)
   modelsList(): Promise<ModelCatalogEntry[]>;

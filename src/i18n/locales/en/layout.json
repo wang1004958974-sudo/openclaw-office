@@ -15,6 +15,7 @@
       "skills": "Skills",
       "cron": "Cron Tasks",
       "agents": "Agents",
+      "aiAccounts": "AI Quotas",
       "settings": "Settings",
       "fallback": "Console"
     },
@@ -53,6 +54,7 @@
     "channels": "Channels",
     "skills": "Skills",
     "cron": "Cron Tasks",
+    "aiAccounts": "AI Quotas",
     "settings": "Settings"
   }
 }

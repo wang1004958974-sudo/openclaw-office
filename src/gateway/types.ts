@@ -250,6 +250,7 @@ export type PageId =
   | "channels"
   | "skills"
   | "cron"
+  | "aiAccounts"
   | "settings";
 
 export interface TokenSnapshot {

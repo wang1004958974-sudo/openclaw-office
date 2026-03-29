@@ -117,6 +117,41 @@
       "description": "确认要登出「{{name}}」吗？登出后需要重新配对。"
     }
   },
+  "aiAccounts": {
+    "title": "AI 额度与用量",
+    "description": "优先读取本地配置中的真实 provider/account；若真实 quota 尚未接入，则明确标注为 unavailable。",
+    "loading": "正在加载账号数据...",
+    "empty": "本地配置中没有发现 AI 账号。",
+    "unavailable": "该账号的真实 quota 尚未接入。当前页面仅展示本地登录/配置信息。",
+    "localOnly": "这个 API Key 账号当前还没有接上官方 quota 快照。若 provider 没有 usage API，当前页面只能先展示本地/配置层信息。",
+    "notIntegrated": "未接入",
+    "available": "可用",
+    "stats": {
+      "total": "总账号数",
+      "ok": "状态正常",
+      "warning": "警告",
+      "error": "错误",
+      "cost30d": "近30天成本",
+      "costToday": "最新一天成本"
+    },
+    "sections": {
+      "grouped": "关联视图",
+      "groupedDesc": "按 provider 家族把已登录账号和已配置 Provider 关联展示",
+      "linkedSummary": "{{auth}} 个 auth 账号 · {{providers}} 个 provider 配置",
+      "auth": "已登录账号",
+      "authDesc": "来自本地 auth.profiles 的登录账号",
+      "authEmpty": "未发现已登录账号",
+      "providers": "已配置 Provider",
+      "providersDesc": "来自本地 models.providers 的 API / Provider 配置",
+      "providersEmpty": "未发现已配置 Provider"
+    },
+    "labels": {
+      "models": "{{count}} 个模型",
+      "estimatedCost": "本地估算成本：${{cost}} · {{tokens}} tokens",
+      "pricingMismatch": "价格配置未命中：已统计 {{tokens}} tokens，但成本未能解析（缺失成本条目：{{missing}}）",
+      "topModels": "按成本排序的模型"
+    }
+  },
   "skills": {
     "title": "技能",
     "description": "管理技能与插件：安装、启停、配置",

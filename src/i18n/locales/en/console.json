@@ -117,6 +117,41 @@
       "description": "Are you sure you want to logout \"{{name}}\"? You will need to re-pair."
     }
   },
+  "aiAccounts": {
+    "title": "AI Quotas & Usage",
+    "description": "Read local configured providers/accounts first. If real quota is unavailable, mark it clearly as unavailable.",
+    "loading": "Loading accounts data...",
+    "empty": "No AI accounts found in local config.",
+    "unavailable": "Real quota is not integrated for this account yet. Currently this page only shows local login/config information.",
+    "localOnly": "This API-key account currently has no official provider quota snapshot. For now this page can only show local/config-based information unless the provider exposes a usage API.",
+    "notIntegrated": "Not integrated",
+    "available": "Available",
+    "stats": {
+      "total": "Total Accounts",
+      "ok": "Healthy",
+      "warning": "Warning",
+      "error": "Error",
+      "cost30d": "30d Cost",
+      "costToday": "Latest Day Cost"
+    },
+    "sections": {
+      "grouped": "Linked Account View",
+      "groupedDesc": "Group signed-in accounts and configured providers by related provider family",
+      "linkedSummary": "{{auth}} auth account(s) · {{providers}} provider config(s)",
+      "auth": "Signed-in Accounts",
+      "authDesc": "Accounts discovered from local auth.profiles",
+      "authEmpty": "No signed-in accounts found",
+      "providers": "Configured Providers",
+      "providersDesc": "Provider/API entries discovered from local models.providers",
+      "providersEmpty": "No configured providers found"
+    },
+    "labels": {
+      "models": "{{count}} model(s)",
+      "estimatedCost": "Estimated local cost: ${{cost}} · {{tokens}} tokens",
+      "pricingMismatch": "Pricing mismatch: {{tokens}} tokens tracked, but cost did not resolve (missing entries: {{missing}})",
+      "topModels": "Top models by cost"
+    }
+  },
   "skills": {
     "title": "Skills",
     "description": "Manage skills and plugins: install, enable/disable, configure",
