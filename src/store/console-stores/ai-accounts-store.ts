@@ -39,6 +39,20 @@ function resolveCostState(totalTokens: number | undefined, totalCost: number | u
   return "unavailable" as const;
 }
 
+function resolveAccountStatus(params: {
+  providerUsage?: UsageInfo["providers"][number];
+  authType: AiAccountUsageInfo["authType"];
+  hasCredentials?: boolean;
+  costState?: AiAccountUsageInfo["costState"];
+}): AiAccountUsageInfo["status"] {
+  const { providerUsage, authType, hasCredentials = false, costState } = params;
+  if ((providerUsage?.error ?? "").trim()) return "error";
+  if ((providerUsage?.windows?.length ?? 0) > 0) return "ok";
+  if (costState === "ok" || costState === "pricing-mismatch") return "warning";
+  if (hasCredentials || authType === "oauth" || authType === "token" || authType === "session") return "warning";
+  return "error";
+}
+
 interface AiAccountsState {
   accounts: AiAccountUsageInfo[];
   groups: AiAccountGroup[];
@@ -140,6 +154,7 @@ function normalizeProviderAccount(providerId: string, provider: ProviderConfig, 
   const authType = hasApiKey ? "apiKey" : "unknown";
   const providerCost = findProviderCost(providerId, meta.id, providerCosts);
   const topModels = findTopModels(providerId, meta.id, modelCosts);
+  const costState = resolveCostState(providerCost?.totals?.totalTokens, providerCost?.totals?.totalCost);
   return {
     accountId: providerId,
     accountLabel: providerId,
@@ -149,12 +164,12 @@ function normalizeProviderAccount(providerId: string, provider: ProviderConfig, 
     plan: providerUsage?.plan,
     authType,
     quotaMode: resolveQuotaMode(providerUsage, authType),
-    costState: resolveCostState(providerCost?.totals?.totalTokens, providerCost?.totals?.totalCost),
+    costState,
     estimatedCost: providerCost?.totals?.totalCost,
     estimatedTokens: providerCost?.totals?.totalTokens,
     missingCostEntries: providerCost?.totals?.missingCostEntries,
     topModels,
-    status: hasApiKey ? "unknown" : "warning",
+    status: resolveAccountStatus({ providerUsage, authType, hasCredentials: hasApiKey, costState }),
     identityHint,
     baseUrl,
     api,
@@ -198,7 +213,7 @@ function buildGroups(accounts: AiAccountUsageInfo[]): AiAccountGroup[] {
   return Array.from(map.values());
 }
 
-function normalizeAuthAccount(profileKey: string, profile: AuthProfile, usage?: UsageInfo, providerCosts?: ProviderCostRow[], modelCosts?: ModelCostRow[]): AiAccountUsageInfo {
+function normalizeAuthAccount(profileKey: string, profile: AuthProfile, usage?: UsageInfo, _providerCosts?: ProviderCostRow[], _modelCosts?: ModelCostRow[]): AiAccountUsageInfo {
   const provider = typeof profile.provider === "string" ? profile.provider : "unknown";
   const mode = typeof profile.mode === "string" ? profile.mode : "unknown";
   const email = typeof profile.email === "string" ? profile.email : undefined;
@@ -216,8 +231,7 @@ function normalizeAuthAccount(profileKey: string, profile: AuthProfile, usage?: 
     })) ?? [];
 
   const authType = mode === "oauth" ? "oauth" : "unknown";
-  const providerCost = findProviderCost(profileKey, provider, providerCosts);
-  const topModels = findTopModels(profileKey, provider, modelCosts);
+  const costState = "unavailable" as const;
   return {
     accountId: profileKey,
     accountLabel: email || profileKey,
@@ -226,12 +240,9 @@ function normalizeAuthAccount(profileKey: string, profile: AuthProfile, usage?: 
     source: "auth",
     authType,
     quotaMode: resolveQuotaMode(providerUsage, authType),
-    costState: resolveCostState(providerCost?.totals?.totalTokens, providerCost?.totals?.totalCost),
-    estimatedCost: providerCost?.totals?.totalCost,
-    estimatedTokens: providerCost?.totals?.totalTokens,
-    missingCostEntries: providerCost?.totals?.missingCostEntries,
-    topModels,
-    status: "unknown",
+    costState,
+    topModels: undefined,
+    status: resolveAccountStatus({ providerUsage, authType, hasCredentials: Boolean(email), costState }),
     identityHint: profileKey,
     email,
     plan: providerUsage?.plan,
@@ -243,7 +254,7 @@ function normalizeAuthAccount(profileKey: string, profile: AuthProfile, usage?: 
       },
     ],
     error: windowsFromUsage.length > 0 ? undefined : "unavailable",
-    lastCheckedAt: usage?.updatedAt ?? Date.now(),
+    lastCheckedAt: usage?.updatedAt,
   };
 }
 
@@ -315,3 +326,9 @@ export const useAiAccountsStore = create<AiAccountsState>()(
     { name: "ai-accounts-store" },
   ),
 );
+
+export const __test__ = {
+  resolveAccountStatus,
+  normalizeAuthAccount,
+  normalizeProviderAccount,
+};
