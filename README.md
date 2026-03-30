@@ -215,6 +215,12 @@ OpenClaw Gateway  ──WebSocket──>  ws-client.ts  ──>  event-parser.ts
 
 Gateway 广播实时事件（`agent`、`presence`、`health`、`heartbeat`）并响应 RPC 请求。前端将 Agent 生命周期事件映射为可视化状态（idle/working/speaking/tool_calling/error），在办公室场景中渲染。
 
+### Session 同步策略
+
+- Agent 与子 Agent 的实时状态、2D 办公室小人走动和会议区移动效果，默认由 WebSocket `agent` 事件直接驱动
+- `sessions.list` 不再用于高频实时驱动，而是作为连接建立后的立即同步和 **60 秒一次** 的低频 reconciliation，用于修复漏事件、断线恢复后的 session 漂移，并复用同一响应构建 token 统计
+- 该策略用于降低 Gateway CPU 压力，避免高频全量扫描影响其他 RPC probe
+
 ---
 
 ## 微信交流群

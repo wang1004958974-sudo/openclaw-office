@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { SubAgentInfo } from "@/gateway/types";
-import { diffSessions, extractSubAgentUuidForTest } from "@/hooks/useSubAgentPoller";
+import {
+  diffSessions,
+  extractSubAgentUuidForTest,
+  toSubAgentInfoList,
+} from "@/hooks/useSubAgentPoller";
 
 function mkSub(key: string, agentId = `agent-${key}`): SubAgentInfo {
   return {
@@ -69,5 +73,38 @@ describe("diffSessions", () => {
     const { added, removed } = diffSessions(prev, next);
     expect(added).toHaveLength(2);
     expect(removed).toHaveLength(2);
+  });
+});
+
+describe("toSubAgentInfoList", () => {
+  it("normalizes raw sessions.list rows using key field", () => {
+    const result = toSubAgentInfoList([
+      {
+        key: "agent:main:subagent:worker-1",
+        agentId: "main",
+        requesterSessionKey: "agent:main:main",
+        label: "Worker",
+      },
+    ]);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        sessionKey: "agent:main:subagent:worker-1",
+        agentId: "worker-1",
+        requesterSessionKey: "agent:main:main",
+        label: "Worker",
+      }),
+    ]);
+  });
+
+  it("ignores rows without requesterSessionKey", () => {
+    const result = toSubAgentInfoList([
+      {
+        key: "agent:main:main",
+        agentId: "main",
+      },
+    ]);
+
+    expect(result).toEqual([]);
   });
 });

@@ -183,6 +183,7 @@ describe("processAgentEvent: real Gateway sub-agent sessionKey", () => {
     expect(sub?.isSubAgent).toBe(true);
     expect(sub?.parentAgentId).toBe("main");
     expect(sub?.confirmed).toBe(true);
+    expect(sub?.movement?.toZone).toBe("hotDesk");
 
     // Main agent should NOT be modified
     const mainAgent = useOfficeStore.getState().agents.get("main");
