@@ -22,7 +22,8 @@ import type {
   TokenSnapshot,
   VisualAgent,
 } from "@/gateway/types";
-import { ZONES, CORRIDOR_ENTRANCE } from "@/lib/constants";
+import { ZONES, CORRIDOR_ENTRANCE, A2A_TOOL_NAMES } from "@/lib/constants";
+import { extractSessionNamespace, extractAgentIdFromSessionKey } from "@/lib/session-key-utils";
 import { allocatePosition, calculateLoungePositions } from "@/lib/position-allocator";
 import {
   planWalkPath,
@@ -43,6 +44,8 @@ const HOTDESK_TO_LOUNGE_DELAY_MS = 30_000;
 const MIN_HOTDESK_STAY_MS = 10_000;
 
 const subAgentRetireTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const meetingRetireTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const MIN_MEETING_STAY_MS = 10_000;
 
 const zoneMigrationTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const confirmationTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -107,6 +110,8 @@ function createVisualAgent(
       confirmed: false,
       arrivedAtHotDeskAt: null,
       pendingRetire: false,
+      arrivedAtMeetingAt: null,
+      manualMeeting: false,
     };
   }
   const position = allocatePosition(id, isSubAgent, occupied);
@@ -131,6 +136,8 @@ function createVisualAgent(
     confirmed: true,
     arrivedAtHotDeskAt: isSubAgent ? Date.now() : null,
     pendingRetire: false,
+    arrivedAtMeetingAt: null,
+    manualMeeting: false,
   };
 }
 
@@ -316,6 +323,8 @@ export const useOfficeStore = create<OfficeStore>()(
             placeholder.confirmed = true;
             placeholder.arrivedAtHotDeskAt = null;
             placeholder.pendingRetire = false;
+            placeholder.arrivedAtMeetingAt = null;
+            placeholder.manualMeeting = false;
             state.agents.set(info.agentId, placeholder);
           } else {
             const occupied = new Set<string>();
@@ -433,6 +442,8 @@ export const useOfficeStore = create<OfficeStore>()(
             confirmed: true,
             arrivedAtHotDeskAt: null,
             pendingRetire: false,
+            arrivedAtMeetingAt: null,
+            manualMeeting: false,
           };
           state.agents.set(phId, ph);
         }
@@ -467,6 +478,12 @@ export const useOfficeStore = create<OfficeStore>()(
     },
 
     returnFromMeeting: (agentId: string) => {
+      // Cancel any pending meeting return timer
+      const pendingTimer = meetingRetireTimers.get(agentId);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        meetingRetireTimers.delete(agentId);
+      }
       const agent = useOfficeStore.getState().agents.get(agentId);
       if (!agent?.originalPosition) return;
       const returnZone = agent.isSubAgent ? "hotDesk" : "desk";
@@ -475,6 +492,8 @@ export const useOfficeStore = create<OfficeStore>()(
         const a = state.agents.get(agentId);
         if (a) {
           a.originalPosition = null;
+          a.arrivedAtMeetingAt = null;
+          a.manualMeeting = false;
         }
       });
       useOfficeStore.getState().startMovement(agentId, returnZone, returnPos);
@@ -508,6 +527,7 @@ export const useOfficeStore = create<OfficeStore>()(
     tickMovement: (agentId: string, deltaTime: number) => {
       let arrivedAtHotDesk = false;
       let arrivedAtLounge = false;
+      let arrivedAtMeeting = false;
 
       set((state) => {
         const agent = state.agents.get(agentId);
@@ -529,6 +549,10 @@ export const useOfficeStore = create<OfficeStore>()(
             agent.arrivedAtHotDeskAt = Date.now();
             arrivedAtHotDesk = true;
           }
+          if (finalZone === "meeting") {
+            agent.arrivedAtMeetingAt = Date.now();
+            arrivedAtMeeting = true;
+          }
           if (finalZone === "lounge" && agent.isSubAgent && agent.pendingRetire) {
             arrivedAtLounge = true;
           }
@@ -541,6 +565,10 @@ export const useOfficeStore = create<OfficeStore>()(
           scheduleRetireAfterMinStay(agentId);
         }
       }
+      if (arrivedAtMeeting) {
+        // No special action needed here; arrivedAtMeetingAt is set in state
+        // scheduleMeetingReturn will use it when gathering triggers departure
+      }
       if (arrivedAtLounge) {
         const agent = useOfficeStore.getState().agents.get(agentId);
         if (agent?.isSubAgent && !agent.isPlaceholder && agent.pendingRetire) {
@@ -552,6 +580,7 @@ export const useOfficeStore = create<OfficeStore>()(
     completeMovement: (agentId: string) => {
       let arrivedHotDesk = false;
       let arrivedLounge = false;
+      let arrivedMeeting = false;
 
       set((state) => {
         const agent = state.agents.get(agentId);
@@ -566,6 +595,10 @@ export const useOfficeStore = create<OfficeStore>()(
           agent.arrivedAtHotDeskAt = Date.now();
           arrivedHotDesk = true;
         }
+        if (finalZone === "meeting") {
+          agent.arrivedAtMeetingAt = Date.now();
+          arrivedMeeting = true;
+        }
         if (finalZone === "lounge" && agent.isSubAgent && agent.pendingRetire) {
           arrivedLounge = true;
         }
@@ -576,6 +609,9 @@ export const useOfficeStore = create<OfficeStore>()(
         if (agent?.pendingRetire) {
           scheduleRetireAfterMinStay(agentId);
         }
+      }
+      if (arrivedMeeting) {
+        // arrivedAtMeetingAt is set; no additional action needed here
       }
       if (arrivedLounge) {
         const agent = useOfficeStore.getState().agents.get(agentId);
@@ -612,6 +648,8 @@ export const useOfficeStore = create<OfficeStore>()(
             confirmed: true,
             arrivedAtHotDeskAt: null,
             pendingRetire: false,
+            arrivedAtMeetingAt: null,
+            manualMeeting: false,
           };
           state.agents.set(phId, ph);
         }
@@ -881,6 +919,47 @@ export const useOfficeStore = create<OfficeStore>()(
           // Trigger meeting gathering when collaboration is detected
           // (works regardless of agentToAgent config — visual-only feature)
           scheduleMeetingGathering();
+        }
+
+        // A2A 工具事件检测：当主 Agent 使用 sessions_send/sessions_spawn 等工具指派其他主 Agent 时
+        // 真实 Gateway 中 peer agent 使用完全不同的 sessionKey，因此只能通过工具事件检测协作关系
+        if (
+          event.stream === "tool" &&
+          event.data.phase === "start" &&
+          typeof event.data.name === "string" &&
+          A2A_TOOL_NAMES.has(event.data.name) &&
+          !isSubAgentSession
+        ) {
+          const toolInput = event.data.input as Record<string, unknown> | undefined;
+          const targetSessionKey = toolInput?.sessionKey as string | undefined;
+          if (targetSessionKey && !targetSessionKey.includes(":subagent:")) {
+            // Resolve target agent from targetSessionKey
+            let targetAgentId: string | null = null;
+
+            // 1. Direct sessionKeyMap lookup
+            const mapped = state.sessionKeyMap.get(targetSessionKey);
+            if (mapped && mapped.length > 0) {
+              targetAgentId = mapped[0];
+            }
+
+            // 2. Parse "agent:<name>:..." pattern to find agent by id/name
+            if (!targetAgentId) {
+              const targetAgentName = extractAgentIdFromSessionKey(targetSessionKey);
+              if (targetAgentName) {
+                for (const [id, a] of state.agents) {
+                  if (!a.isSubAgent && !a.isPlaceholder && (a.id === targetAgentName || a.name === targetAgentName)) {
+                    targetAgentId = id;
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (targetAgentId && targetAgentId !== agentId) {
+              createPeerCollaborationLink(state, agentId, targetAgentId);
+              scheduleMeetingGathering();
+            }
+          }
         }
 
         const agent = state.agents.get(agentId);
@@ -1188,6 +1267,48 @@ function updateCollaborationLinks(
 ): void {
   const agents = state.sessionKeyMap.get(sessionKey);
   if (!agents || agents.length < 2) {
+    // Try namespace-based matching for mock/non-standard sessionKey scenarios
+    const ns = extractSessionNamespace(sessionKey);
+    if (ns) {
+      const nsAgents = new Set<string>();
+      for (const [sk, ids] of state.sessionKeyMap) {
+        if (extractSessionNamespace(sk) === ns && !sk.includes(":subagent:")) {
+          for (const id of ids) nsAgents.add(id);
+        }
+      }
+      if (nsAgents.size >= 2) {
+        // Build links between all agents in the same namespace
+        const nsAgentList = Array.from(nsAgents);
+        const now = Date.now();
+        for (let i = 0; i < nsAgentList.length; i++) {
+          for (let j = i + 1; j < nsAgentList.length; j++) {
+            const a = nsAgentList[i];
+            const b = nsAgentList[j];
+            const existingIdx = state.links.findIndex(
+              (l) =>
+                l.sessionKey === sessionKey &&
+                ((l.sourceId === a && l.targetId === b) || (l.sourceId === b && l.targetId === a)),
+            );
+            if (existingIdx >= 0) {
+              state.links[existingIdx].lastActivityAt = now;
+              state.links[existingIdx].strength = Math.min(
+                state.links[existingIdx].strength + 0.1,
+                1,
+              );
+            } else {
+              state.links.push({
+                sourceId: a,
+                targetId: b,
+                sessionKey,
+                strength: 0.3,
+                lastActivityAt: now,
+              });
+            }
+          }
+        }
+        state.links = state.links.filter((l) => now - l.lastActivityAt < LINK_TIMEOUT_MS);
+      }
+    }
     return;
   }
 
@@ -1223,6 +1344,51 @@ function updateCollaborationLinks(
   state.links = state.links.filter((l) => now - l.lastActivityAt < LINK_TIMEOUT_MS);
 }
 
+/**
+ * Create a direct peer collaboration link between two main agents.
+ * Used when an A2A tool event (sessions_send, sessions_spawn, etc.) is detected.
+ * These links bypass sessionKey matching since peer agents use different session keys.
+ */
+function createPeerCollaborationLink(
+  state: { links: CollaborationLink[]; agents: Map<string, VisualAgent> },
+  sourceId: string,
+  targetId: string,
+): void {
+  if (sourceId === targetId) return;
+  const source = state.agents.get(sourceId);
+  const target = state.agents.get(targetId);
+  if (!source || !target) return;
+  // Only link main agents (not sub-agents) for meeting zone
+  if (source.isSubAgent || target.isSubAgent) return;
+
+  const peerSessionKey = `peer:${[sourceId, targetId].sort().join(":")}`;
+  const now = Date.now();
+
+  const existingIdx = state.links.findIndex(
+    (l) =>
+      (l.sourceId === sourceId && l.targetId === targetId) ||
+      (l.sourceId === targetId && l.targetId === sourceId),
+  );
+
+  if (existingIdx >= 0) {
+    state.links[existingIdx].lastActivityAt = now;
+    state.links[existingIdx].strength = Math.min(state.links[existingIdx].strength + 0.15, 1);
+    state.links[existingIdx].isPeer = true;
+  } else {
+    state.links.push({
+      sourceId,
+      targetId,
+      sessionKey: peerSessionKey,
+      strength: 0.5, // Start above threshold immediately
+      lastActivityAt: now,
+      isPeer: true,
+    });
+  }
+
+  // Decay stale links
+  state.links = state.links.filter((l) => now - l.lastActivityAt < LINK_TIMEOUT_MS);
+}
+
 function scheduleMeetingGathering(): void {
   if (meetingGatheringTimer) return;
   meetingGatheringTimer = setTimeout(() => {
@@ -1246,6 +1412,7 @@ function scheduleMeetingGathering(): void {
       groups,
       (id, pos) => useOfficeStore.getState().moveToMeeting(id, pos),
       (id) => useOfficeStore.getState().returnFromMeeting(id),
+      (id) => scheduleMeetingReturn(id),
     );
   }, MEETING_GATHERING_THROTTLE_MS);
 }
@@ -1357,4 +1524,59 @@ function scheduleRetireAfterMinStay(agentId: string): void {
   }
 
   // Walking to lounge already — tickMovement will handle removal on arrival
+}
+
+/**
+ * Schedule a meeting return for a main agent, enforcing the minimum 10s stay.
+ * Called instead of returnFromMeeting when applyMeetingGathering detects an agent should leave.
+ *
+ * Possible states:
+ * - Still walking TO meeting → record intent, re-invoke once arrived (tickMovement sets arrivedAtMeetingAt)
+ * - At meeting, arrived recently → schedule timer for remaining wait
+ * - At meeting, stayed long enough → return immediately
+ */
+function scheduleMeetingReturn(agentId: string): void {
+  // Cancel any existing timer
+  const existingTimer = meetingRetireTimers.get(agentId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    meetingRetireTimers.delete(agentId);
+  }
+
+  const agent = useOfficeStore.getState().agents.get(agentId);
+  if (!agent) return;
+  // Don't return agents that are already leaving or gone
+  if (agent.zone !== "meeting" && agent.movement?.toZone !== "meeting") return;
+  // Skip manual meeting agents
+  if (agent.manualMeeting) return;
+
+  // Still walking to meeting — schedule a follow-up check after expected arrival
+  if (agent.movement?.toZone === "meeting") {
+    const remaining = agent.movement.duration * (1 - agent.movement.progress) + MIN_MEETING_STAY_MS;
+    const timer = setTimeout(() => {
+      meetingRetireTimers.delete(agentId);
+      scheduleMeetingReturn(agentId);
+    }, remaining);
+    meetingRetireTimers.set(agentId, timer);
+    return;
+  }
+
+  // At meeting — check minimum stay
+  if (agent.zone === "meeting") {
+    const arrived = agent.arrivedAtMeetingAt ?? Date.now();
+    const elapsed = Date.now() - arrived;
+    const remaining = MIN_MEETING_STAY_MS - elapsed;
+
+    if (remaining > 0) {
+      const timer = setTimeout(() => {
+        meetingRetireTimers.delete(agentId);
+        scheduleMeetingReturn(agentId);
+      }, remaining);
+      meetingRetireTimers.set(agentId, timer);
+      return;
+    }
+
+    // Min stay satisfied → return to original zone
+    useOfficeStore.getState().returnFromMeeting(agentId);
+  }
 }

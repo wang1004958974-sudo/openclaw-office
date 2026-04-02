@@ -174,6 +174,10 @@ export interface VisualAgent {
   arrivedAtHotDeskAt: number | null;
   /** Whether lifecycle end has been received but retirement is deferred */
   pendingRetire: boolean;
+  /** Timestamp when this agent arrived at meeting zone (for minimum 10s stay enforcement) */
+  arrivedAtMeetingAt: number | null;
+  /** Whether this agent was manually moved to meeting zone (won't be auto-returned by gathering) */
+  manualMeeting: boolean;
 }
 
 export interface ToolCallRecord {
@@ -187,6 +191,8 @@ export interface CollaborationLink {
   sessionKey: string;
   strength: number;
   lastActivityAt: number;
+  /** 是否是 peer agent 直接指派产生的链接（通过 A2A 工具事件检测到） */
+  isPeer?: boolean;
 }
 
 export interface EventHistoryItem {

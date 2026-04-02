@@ -215,6 +215,12 @@ OpenClaw Gateway  ──WebSocket──>  ws-client.ts  ──>  event-parser.ts
 
 The Gateway broadcasts real-time events (`agent`, `presence`, `health`, `heartbeat`) and responds to RPC requests. The frontend maps Agent lifecycle events to visual states (idle, working, speaking, tool_calling, error) and renders them in the office scene.
 
+### Session Synchronization Strategy
+
+- Real-time Agent and SubAgent state, 2D office walking animation, and meeting-zone movement are driven directly by WebSocket `agent` events
+- `sessions.list` is no longer used as a high-frequency real-time driver; it is used for immediate sync after connection and a **60-second** low-frequency reconciliation pass to recover from missed events and reconnect drift, while reusing the same response for token aggregation
+- This strategy reduces Gateway CPU pressure and avoids letting high-frequency full-session scans interfere with other RPC probes
+
 ---
 
 ## Contributing

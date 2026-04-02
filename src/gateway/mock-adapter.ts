@@ -464,47 +464,93 @@ class SubAgentSimulator {
       let b = a;
       while (b === a) b = agents[Math.floor(Math.random() * agents.length)];
 
-      const sessionKey = `a2a-${Date.now()}`;
+      const sessionKeyA = `agent:${a}:main`;
+      const sessionKeyB = `agent:${b}:main`;
+      const sharedSessionKey = `a2a-${Date.now()}`;
       const runIdA = `a2a-run-${a}-${Date.now()}`;
       const runIdB = `a2a-run-${b}-${Date.now()}`;
 
-      // Both agents start in the same session (triggers collaboration link)
+      // Agent A starts running (lifecycle start with its own session)
       this.emit("agent", {
         runId: runIdA,
         seq: 1,
         stream: "lifecycle",
         ts: Date.now(),
         data: { phase: "start", agentId: a },
-        sessionKey,
-      });
-      this.emit("agent", {
-        runId: runIdB,
-        seq: 1,
-        stream: "lifecycle",
-        ts: Date.now(),
-        data: { phase: "start", agentId: b },
-        sessionKey,
+        sessionKey: sessionKeyA,
       });
 
-      // End communication after some time
-      const commDuration = randRange(10_000, 20_000);
+      // Agent A publishes sessions_send tool event targeting Agent B's session
+      // 这是真实 Gateway 中 peer agent 协作的可检测信号
       this.schedule(() => {
         if (!this.running) return;
         this.emit("agent", {
           runId: runIdA,
           seq: 2,
+          stream: "tool",
+          ts: Date.now(),
+          data: {
+            phase: "start",
+            name: "sessions_send",
+            input: {
+              sessionKey: sessionKeyB,
+              message: `Task assigned by ${a}: please handle this`,
+            },
+          },
+          sessionKey: sessionKeyA,
+        });
+
+        // Also register a2a session key for both (mock compat path)
+        this.emit("agent", {
+          runId: runIdA,
+          seq: 3,
           stream: "lifecycle",
           ts: Date.now(),
-          data: { phase: "end", agentId: a },
-          sessionKey,
+          data: { phase: "thinking", agentId: a },
+          sessionKey: sharedSessionKey,
+        });
+      }, 800);
+
+      // Agent B starts running (lifecycle start with its own session)
+      this.schedule(() => {
+        if (!this.running) return;
+        this.emit("agent", {
+          runId: runIdB,
+          seq: 1,
+          stream: "lifecycle",
+          ts: Date.now(),
+          data: { phase: "start", agentId: b },
+          sessionKey: sessionKeyB,
         });
         this.emit("agent", {
           runId: runIdB,
           seq: 2,
           stream: "lifecycle",
           ts: Date.now(),
+          data: { phase: "thinking", agentId: b },
+          sessionKey: sharedSessionKey,
+        });
+      }, 1500);
+
+      // End communication after some time
+      const commDuration = randRange(12_000, 22_000);
+      this.schedule(() => {
+        if (!this.running) return;
+        this.emit("agent", {
+          runId: runIdA,
+          seq: 4,
+          stream: "lifecycle",
+          ts: Date.now(),
+          data: { phase: "end", agentId: a },
+          sessionKey: sessionKeyA,
+        });
+        this.emit("agent", {
+          runId: runIdB,
+          seq: 3,
+          stream: "lifecycle",
+          ts: Date.now(),
           data: { phase: "end", agentId: b },
-          sessionKey,
+          sessionKey: sessionKeyB,
         });
       }, commDuration);
 

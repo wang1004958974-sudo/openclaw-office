@@ -26,6 +26,10 @@ function makeAgent(id: string, zone: string = "desk"): VisualAgent {
     originalPosition: null,
     movement: null,
     confirmed: true,
+    arrivedAtHotDeskAt: null,
+    pendingRetire: false,
+    arrivedAtMeetingAt: null,
+    manualMeeting: false,
   };
 }
 
@@ -187,5 +191,90 @@ describe("meeting-manager", () => {
       expect(returnFromMeeting).toHaveBeenCalledWith("a1");
       expect(returnFromMeeting).toHaveBeenCalledWith("a2");
     });
+
+    it("calls scheduleMeetingReturn instead of returnFromMeeting when provided", () => {
+      const a1 = makeAgent("a1", "meeting");
+      const agents = new Map([["a1", a1]]);
+      const moveToMeeting = vi.fn();
+      const returnFromMeeting = vi.fn();
+      const scheduleMeetingReturn = vi.fn();
+
+      // Empty groups → agent should leave, but via scheduleMeetingReturn
+      applyMeetingGathering(agents, [], moveToMeeting, returnFromMeeting, scheduleMeetingReturn);
+      expect(scheduleMeetingReturn).toHaveBeenCalledWith("a1");
+      expect(returnFromMeeting).not.toHaveBeenCalled();
+    });
+
+    it("does not call returnFromMeeting for manualMeeting agents", () => {
+      const a1 = makeAgent("a1", "meeting");
+      a1.manualMeeting = true;
+      const agents = new Map([["a1", a1]]);
+      const moveToMeeting = vi.fn();
+      const returnFromMeeting = vi.fn();
+
+      // Empty groups → manualMeeting agent should NOT be returned
+      applyMeetingGathering(agents, [], moveToMeeting, returnFromMeeting);
+      expect(returnFromMeeting).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("detectMeetingGroups — sub-agent exclusion", () => {
+    it("excludes sub-agents from meeting groups", () => {
+      const mainAgent = makeAgent("main");
+      const subAgent = makeAgent("sub");
+      subAgent.isSubAgent = true;
+      const agents = new Map([
+        ["main", mainAgent],
+        ["sub", subAgent],
+      ]);
+      const links: CollaborationLink[] = [
+        {
+          sourceId: "main",
+          targetId: "sub",
+          sessionKey: "s1",
+          strength: 0.8,
+          lastActivityAt: Date.now(),
+        },
+      ];
+      // sub-agent should be excluded → no group formed
+      const groups = detectMeetingGroups(links, agents);
+      expect(groups).toHaveLength(0);
+    });
+
+    it("forms meeting group only when both agents are non-sub-agent", () => {
+      const a1 = makeAgent("a1");
+      const a2 = makeAgent("a2");
+      const subAgent = makeAgent("sub");
+      subAgent.isSubAgent = true;
+      const agents = new Map([
+        ["a1", a1],
+        ["a2", a2],
+        ["sub", subAgent],
+      ]);
+      const links: CollaborationLink[] = [
+        {
+          sourceId: "a1",
+          targetId: "a2",
+          sessionKey: "peer:a1:a2",
+          strength: 0.6,
+          lastActivityAt: Date.now(),
+          isPeer: true,
+        },
+        {
+          sourceId: "a1",
+          targetId: "sub",
+          sessionKey: "s-sub",
+          strength: 0.8,
+          lastActivityAt: Date.now(),
+        },
+      ];
+      const groups = detectMeetingGroups(links, agents);
+      // Only the peer link between two main agents should form a group
+      expect(groups).toHaveLength(1);
+      expect(groups[0].agentIds).toContain("a1");
+      expect(groups[0].agentIds).toContain("a2");
+      expect(groups[0].agentIds).not.toContain("sub");
+    });
   });
 });
+

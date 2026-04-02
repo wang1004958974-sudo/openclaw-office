@@ -2,18 +2,13 @@ import { useEffect, useRef } from "react";
 import type { GatewayRpcClient } from "@/gateway/rpc-client";
 import type { TokenSnapshot } from "@/gateway/types";
 import { useOfficeStore } from "@/store/office-store";
+import { toSubAgentInfoList, type SessionEntry } from "./useSubAgentPoller";
 
 const POLL_INTERVAL_MS = 60_000;
 const FAILURE_THRESHOLD = 3;
 
-interface SessionTokenRow {
-  key?: string;
-  totalTokens?: number;
-  totalTokensFresh?: boolean;
-}
-
 interface SessionsListResponse {
-  sessions?: SessionTokenRow[];
+  sessions?: SessionEntry[];
 }
 
 interface UsageCostResponse {
@@ -41,6 +36,7 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
   const connectionStatus = useOfficeStore((s) => s.connectionStatus);
   const pushTokenSnapshot = useOfficeStore((s) => s.pushTokenSnapshot);
   const setAgentCosts = useOfficeStore((s) => s.setAgentCosts);
+  const setSessionsSnapshot = useOfficeStore((s) => s.setSessionsSnapshot);
 
   useEffect(() => {
     if (connectionStatus !== "connected" || !rpcRef.current) {
@@ -66,7 +62,14 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
 
         failureCountRef.current = 0;
 
-        const snapshot = buildSnapshotFromSessions(sessionsResp?.sessions ?? []);
+        const fetchedAt = Date.now();
+        const sessionRows = sessionsResp?.sessions ?? [];
+        setSessionsSnapshot({
+          sessions: toSubAgentInfoList(sessionRows),
+          fetchedAt,
+        });
+
+        const snapshot = buildSnapshotFromSessions(sessionRows);
 
         if (snapshot) {
           pushTokenSnapshot(snapshot);
@@ -99,10 +102,10 @@ export function useUsagePoller(rpcRef: React.RefObject<GatewayRpcClient | null>)
         timerRef.current = null;
       }
     };
-  }, [connectionStatus, pushTokenSnapshot, setAgentCosts]);
+  }, [connectionStatus, pushTokenSnapshot, setAgentCosts, setSessionsSnapshot]);
 }
 
-export function buildSnapshotFromSessions(sessions: SessionTokenRow[]): TokenSnapshot | null {
+export function buildSnapshotFromSessions(sessions: SessionEntry[]): TokenSnapshot | null {
   const byAgent: Record<string, number> = {};
   let total = 0;
 

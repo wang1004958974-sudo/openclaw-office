@@ -8,8 +8,9 @@ import {
   ZONE_COLORS,
   ZONE_COLORS_DARK,
 } from "@/lib/constants";
-import { calculateDeskSlots, calculateMeetingSeatsSvg } from "@/lib/position-allocator";
+import { calculateDeskSlots } from "@/lib/position-allocator";
 import { useOfficeStore } from "@/store/office-store";
+import { detectMeetingGroups, calculateMeetingSeats } from "@/store/meeting-manager";
 import { AgentAvatar } from "./AgentAvatar";
 import { ConnectionLine } from "./ConnectionLine";
 import { DeskUnit } from "./DeskUnit";
@@ -67,20 +68,42 @@ export function FloorPlan() {
     [hotDeskAgents.length, maxSubAgents],
   );
 
-  const meetingCenter = {
+  // 多桌渲染：用 detectMeetingGroups 的分组结果，每组渲染一张桌子
+  const meetingGroups = useMemo(
+    () => detectMeetingGroups(links, agents),
+    [links, agents],
+  );
+
+  // 每组的座位分配（基于 agent.position，已由 store 的 moveToMeeting + allocateMeetingPositions 分配好）
+  // 这里只需要知道每组有哪些 agent + 对应的 tableCenter 用于渲染桌子和椅子
+  const meetingGroupTableData = useMemo(() => {
+    const MEETING_ZONE = ZONES.meeting;
+    const tableCenters = [
+      { x: MEETING_ZONE.x + MEETING_ZONE.width / 2, y: MEETING_ZONE.y + MEETING_ZONE.height / 2 },
+      {
+        x: MEETING_ZONE.x + MEETING_ZONE.width * 0.3,
+        y: MEETING_ZONE.y + MEETING_ZONE.height * 0.3,
+      },
+      {
+        x: MEETING_ZONE.x + MEETING_ZONE.width * 0.7,
+        y: MEETING_ZONE.y + MEETING_ZONE.height * 0.7,
+      },
+    ];
+    return meetingGroups.map((group, i) => {
+      const center = tableCenters[i % tableCenters.length];
+      const seatsMap = calculateMeetingSeats(group, i);
+      const agentsInGroup = group.agentIds
+        .map((id) => agents.get(id))
+        .filter((a): a is VisualAgent => a !== undefined);
+      return { group, center, seatsMap, agentsInGroup };
+    });
+  }, [meetingGroups, agents]);
+
+  // 默认的单桌圆心（无会议时展示空椅装饰用）
+  const defaultMeetingCenter = {
     x: ZONES.meeting.x + ZONES.meeting.width / 2,
     y: ZONES.meeting.y + ZONES.meeting.height / 2,
   };
-
-  const meetingTableRadius = Math.min(
-    60 + meetingAgents.length * 8,
-    Math.min(ZONES.meeting.width, ZONES.meeting.height) / 2 - 40,
-  );
-
-  const meetingSeats = useMemo(
-    () => calculateMeetingSeatsSvg(meetingAgents.length, meetingCenter, meetingTableRadius + 36),
-    [meetingAgents.length, meetingCenter.x, meetingCenter.y, meetingTableRadius],
-  );
 
   return (
     <div className="relative h-full w-full bg-gray-100 dark:bg-gray-950">
@@ -159,17 +182,48 @@ export function FloorPlan() {
         <DeskZoneFurniture deskSlots={deskSlots} deskAgents={deskAgents} />
 
         {/* ── Layer 5: Furniture – Meeting zone ── */}
-        <MeetingTable
-          x={meetingCenter.x}
-          y={meetingCenter.y}
-          radius={meetingTableRadius}
-          isDark={isDark}
-        />
-        <MeetingChairs
-          seats={meetingSeats}
-          meetingAgentCount={meetingAgents.length}
-          isDark={isDark}
-        />
+        {meetingGroupTableData.length === 0 ? (
+          // 无会议时：渲染默认单桌 + 6 空椅装饰
+          <>
+            <MeetingTable
+              x={defaultMeetingCenter.x}
+              y={defaultMeetingCenter.y}
+              radius={60}
+              isDark={isDark}
+            />
+            <MeetingChairs
+              seats={[]}
+              meetingAgentCount={0}
+              tableCenter={defaultMeetingCenter}
+              isDark={isDark}
+            />
+          </>
+        ) : (
+          // 有会议时：按分组渲染每桌
+          meetingGroupTableData.map((tableData, i) => {
+            const radius = Math.min(
+              55 + tableData.agentsInGroup.length * 8,
+              Math.min(ZONES.meeting.width, ZONES.meeting.height) / (meetingGroupTableData.length > 1 ? 3.5 : 2.3) - 20,
+            );
+            const seatPositions = tableData.agentsInGroup.map((a) => a.position);
+            return (
+              <g key={`meeting-table-group-${i}`}>
+                <MeetingTable
+                  x={tableData.center.x}
+                  y={tableData.center.y}
+                  radius={radius}
+                  isDark={isDark}
+                />
+                <MeetingChairs
+                  seats={seatPositions}
+                  meetingAgentCount={tableData.agentsInGroup.length}
+                  tableCenter={tableData.center}
+                  isDark={isDark}
+                />
+              </g>
+            );
+          })
+        )}
 
         {/* ── Layer 5: Furniture – Hot desk zone ── */}
         <HotDeskZoneFurniture slots={hotDeskSlots} agents={hotDeskAgents} />
@@ -202,12 +256,10 @@ export function FloorPlan() {
           );
         })}
 
-        {/* ── Layer 7: Meeting agents (seated) ── */}
-        {meetingAgents.map((agent, i) => {
-          const seat = meetingSeats[i];
-          if (!seat) return null;
-          return <AgentAvatar key={agent.id} agent={{ ...agent, position: seat }} />;
-        })}
+        {/* ── Layer 7: Meeting agents (seated) — 使用 agent.position（已由 moveToMeeting 分配好） ── */}
+        {meetingAgents.map((agent) => (
+          <AgentAvatar key={agent.id} agent={agent} />
+        ))}
 
         {/* ── Layer 7b: Unconfirmed agents at entrance (semi-transparent) ── */}
         {corridorAgents.map((agent) => (
@@ -430,17 +482,14 @@ function HotDeskZoneFurniture({
 function MeetingChairs({
   seats,
   meetingAgentCount,
+  tableCenter,
   isDark,
 }: {
   seats: Array<{ x: number; y: number }>;
   meetingAgentCount: number;
+  tableCenter: { x: number; y: number };
   isDark: boolean;
 }) {
-  const meetingCenter = {
-    x: ZONES.meeting.x + ZONES.meeting.width / 2,
-    y: ZONES.meeting.y + ZONES.meeting.height / 2,
-  };
-
   if (meetingAgentCount > 0) {
     return (
       <g>
@@ -460,8 +509,8 @@ function MeetingChairs({
         return (
           <Chair
             key={`mc-empty-${i}`}
-            x={Math.round(meetingCenter.x + Math.cos(angle) * emptyRadius)}
-            y={Math.round(meetingCenter.y + Math.sin(angle) * emptyRadius)}
+            x={Math.round(tableCenter.x + Math.cos(angle) * emptyRadius)}
+            y={Math.round(tableCenter.y + Math.sin(angle) * emptyRadius)}
             isDark={isDark}
           />
         );

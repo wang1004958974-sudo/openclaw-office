@@ -1,5 +1,48 @@
-import { describe, expect, it, vi } from "vitest";
-import { buildAgentCostsFromSessionsUsage, buildSnapshotFromSessions } from "@/hooks/useUsagePoller";
+import { act, render } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { createElement, useRef, type RefObject } from "react";
+import type { GatewayRpcClient } from "@/gateway/rpc-client";
+import { buildAgentCostsFromSessionsUsage, buildSnapshotFromSessions, useUsagePoller } from "@/hooks/useUsagePoller";
+import { useOfficeStore } from "@/store/office-store";
+
+function UsagePollerHarness({ rpcRef }: { rpcRef: RefObject<GatewayRpcClient | null> }) {
+  useUsagePoller(rpcRef);
+  return null;
+}
+
+function resetStore() {
+  useOfficeStore.setState({
+    agents: new Map(),
+    links: [],
+    globalMetrics: {
+      activeAgents: 0,
+      totalAgents: 0,
+      totalTokens: 0,
+      tokenRate: 0,
+      collaborationHeat: 0,
+    },
+    connectionStatus: "connected",
+    connectionError: null,
+    selectedAgentId: null,
+    eventHistory: [],
+    sidebarCollapsed: false,
+    lastSessionsSnapshot: null,
+    runIdMap: new Map(),
+    sessionKeyMap: new Map(),
+    agentCosts: {},
+    tokenHistory: [],
+  });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  resetStore();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("buildSnapshotFromSessions", () => {
   it("aggregates fresh session totals by agent", () => {
@@ -61,5 +104,97 @@ describe("buildAgentCostsFromSessionsUsage", () => {
       }),
     ).toBeNull();
     expect(buildAgentCostsFromSessionsUsage(null)).toBeNull();
+  });
+});
+
+describe("useUsagePoller", () => {
+  it("updates both session snapshot and token snapshot from one sessions.list response", async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === "sessions.list") {
+        return {
+          sessions: [
+            {
+              key: "agent:main:main",
+              agentId: "main",
+              totalTokens: 1200,
+              totalTokensFresh: true,
+            },
+            {
+              key: "agent:main:subagent:worker-1",
+              agentId: "main",
+              requesterSessionKey: "agent:main:main",
+              label: "Worker-1",
+              totalTokens: 300,
+              totalTokensFresh: true,
+            },
+          ],
+        };
+      }
+      if (method === "sessions.usage") {
+        return null;
+      }
+      if (method === "usage.cost") {
+        return null;
+      }
+      return null;
+    });
+
+    function Wrapper() {
+      const rpcRef = useRef({ request } as GatewayRpcClient);
+      useUsagePoller(rpcRef as RefObject<GatewayRpcClient | null>);
+      return null;
+    }
+
+    render(createElement(Wrapper));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(useOfficeStore.getState().lastSessionsSnapshot?.sessions).toEqual([
+      expect.objectContaining({
+        agentId: "worker-1",
+        sessionKey: "agent:main:subagent:worker-1",
+      }),
+    ]);
+
+    const latest = useOfficeStore.getState().tokenHistory.at(-1);
+    expect(latest?.total).toBe(1500);
+    expect(latest?.byAgent).toEqual({ main: 1500 });
+
+    expect(request).toHaveBeenCalledWith("sessions.list");
+  });
+
+  it("polls again after 60 seconds", async () => {
+    const request = vi.fn(async (method: string) => {
+      if (method === "sessions.list") {
+        return { sessions: [] };
+      }
+      return null;
+    });
+
+    function Wrapper() {
+      const rpcRef = useRef({ request } as GatewayRpcClient);
+      useUsagePoller(rpcRef as RefObject<GatewayRpcClient | null>);
+      return null;
+    }
+
+    render(createElement(Wrapper));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(request).toHaveBeenCalledWith("sessions.list");
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(request.mock.calls.filter(([method]) => method === "sessions.list")).toHaveLength(2);
   });
 });

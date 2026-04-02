@@ -32,7 +32,6 @@ OpenClaw Office 是 [OpenClaw](https://github.com/openclaw/openclaw) Multi-Agent
 等距风格的 2D/3D 虚拟办公室，实时展示 Agent 工作状态：
 
 - **2D 平面图** — SVG 渲染的办公室场景，含工位、家具（桌椅/沙发/植物/咖啡杯）、Agent 头像和状态动画
-- **3D 场景** — R3F 渲染的 3D 办公室，含角色模型、技能全息面板、传送门特效
 - **Agent 头像** — 基于 agentId 确定性生成的 SVG 头像，支持状态指示（idle/working/speaking/error）
 - **协作连线** — Agent 间的消息传递可视化
 - **气泡面板** — Markdown 文本流、工具调用展示

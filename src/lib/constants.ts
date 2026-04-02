@@ -23,7 +23,7 @@ const bottomY = OFFICE.y + halfH + OFFICE.corridorWidth;
 export const ZONES = {
   desk: { x: OFFICE.x, y: OFFICE.y, width: halfW, height: halfH, label: "固定工位区" },
   meeting: { x: rightX, y: OFFICE.y, width: halfW, height: halfH, label: "会议区" },
-  hotDesk: { x: OFFICE.x, y: bottomY, width: halfW, height: halfH, label: "热工位区" },
+  hotDesk: { x: OFFICE.x, y: bottomY, width: halfW, height: halfH, label: "临时工位区" },
   lounge: { x: rightX, y: bottomY, width: halfW, height: halfH, label: "休息区" },
 } as const;
 
@@ -56,6 +56,14 @@ export const ZONE_COLORS_DARK = {
   corridor: "#0f172a",
   wall: "#475569",
 } as const;
+
+/** A2A 工具名称集合：主 Agent 通过这些工具指派/联络其他主 Agent（非 sub-agent）进行协作 */
+export const A2A_TOOL_NAMES = new Set([
+  "sessions_send",
+  "sessions_spawn",
+  "session_message",
+  "sessions_create",
+]);
 
 export const STATUS_COLORS: Record<AgentVisualStatus, string> = {
   idle: "#22c55e",
