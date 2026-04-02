@@ -206,13 +206,13 @@ export function inferProviderType(
   if (baseUrl) {
     if (baseUrl.includes("anthropic.com")) return PROVIDER_TYPE_INFO[0];
     if (baseUrl.includes("openai.com")) return PROVIDER_TYPE_INFO[1];
-    if (baseUrl.includes("googleapis.com")) return PROVIDER_TYPE_INFO[2];
-    if (baseUrl.includes("openrouter.ai")) return PROVIDER_TYPE_INFO[3];
-    if (baseUrl.includes("deepseek.com")) return PROVIDER_TYPE_INFO[4];
-    if (baseUrl.includes("moonshot.cn")) return PROVIDER_TYPE_INFO[5];
-    if (baseUrl.includes("dashscope.aliyuncs.com")) return PROVIDER_TYPE_INFO[6];
-    if (baseUrl.includes("siliconflow.cn")) return PROVIDER_TYPE_INFO[7];
-    if (baseUrl.includes("localhost:11434")) return PROVIDER_TYPE_INFO[8];
+    if (baseUrl.includes("googleapis.com")) return PROVIDER_TYPE_INFO[3];
+    if (baseUrl.includes("openrouter.ai")) return PROVIDER_TYPE_INFO[4];
+    if (baseUrl.includes("deepseek.com")) return PROVIDER_TYPE_INFO[5];
+    if (baseUrl.includes("moonshot.cn")) return PROVIDER_TYPE_INFO[6];
+    if (baseUrl.includes("dashscope.aliyuncs.com")) return PROVIDER_TYPE_INFO[7];
+    if (baseUrl.includes("siliconflow.cn")) return PROVIDER_TYPE_INFO[8];
+    if (baseUrl.includes("localhost:11434")) return PROVIDER_TYPE_INFO[9];
   }
 
   return PROVIDER_TYPE_INFO[PROVIDER_TYPE_INFO.length - 1];

@@ -1,5 +1,5 @@
 import { Radio, Wrench, Zap, Clock, RefreshCw, WifiOff, Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertBanner } from "@/components/console/dashboard/AlertBanner";
 import { ChannelOverview } from "@/components/console/dashboard/ChannelOverview";
@@ -15,10 +15,22 @@ export function DashboardPage() {
   const { t } = useTranslation("console");
   const { channelsSummary, skillsSummary, usage, isLoading, error, refresh } = useDashboardStore();
   const wsStatus = useOfficeStore((s) => s.connectionStatus);
+  const providerOptions = useMemo(() => usage?.providers ?? [], [usage]);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!providerOptions.length) {
+      if (selectedProvider) setSelectedProvider("");
+      return;
+    }
+    if (!selectedProvider || !providerOptions.some((p) => p.provider === selectedProvider)) {
+      setSelectedProvider(providerOptions[0]?.provider ?? "");
+    }
+  }, [providerOptions, selectedProvider]);
 
   if (isLoading && channelsSummary.length === 0) {
     const isDisconnected = wsStatus !== "connected" && wsStatus !== "connecting";
@@ -60,7 +72,7 @@ export function DashboardPage() {
   const errorChannelCount = channelsSummary.filter((c) => c.status === "error").length;
   const enabledSkillCount = skillsSummary.filter((s) => s.enabled).length;
 
-  const primaryProvider = usage?.providers[0];
+  const primaryProvider = providerOptions.find((p) => p.provider === selectedProvider) ?? providerOptions[0];
   const primaryWindow = primaryProvider?.windows[0];
   const usageDisplay = primaryProvider
     ? `${primaryProvider.displayName}: ${primaryWindow?.usedPercent ?? 0}%`
@@ -102,8 +114,22 @@ export function DashboardPage() {
           icon={Zap}
           title={t("dashboard.stats.usage")}
           value={usageDisplay}
+          subtitle={primaryProvider ? undefined : "No provider usage data"}
           progress={primaryWindow?.usedPercent}
           color="text-blue-500"
+          headerExtra={providerOptions.length > 0 ? (
+            <select
+              value={primaryProvider?.provider ?? ""}
+              onChange={(e) => setSelectedProvider(e.target.value)}
+              className="min-w-[110px] rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+            >
+              {providerOptions.map((provider) => (
+                <option key={provider.provider} value={provider.provider}>
+                  {provider.displayName}
+                </option>
+              ))}
+            </select>
+          ) : null}
         />
         <StatCard
           icon={Clock}

@@ -179,9 +179,12 @@ function WindowCard({ window }: { window: UsageLimitWindow }) {
   const unavailable = window.source === "unavailable" || !hasUsageSignal;
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-800/50">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{window.label}</span>
-        {window.source === "derived" ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-blue-500 dark:bg-blue-900/30">derived</span> : null}
+        <div className="flex items-center gap-1.5">
+          {window.unit === "requests" ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">request quota</span> : null}
+          {window.source === "derived" ? <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-blue-500 dark:bg-blue-900/30">openclaw</span> : null}
+        </div>
       </div>
       {unavailable ? (
         <div>
@@ -197,7 +200,11 @@ function WindowCard({ window }: { window: UsageLimitWindow }) {
             </div>
           ) : (
             <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {window.usedPercent !== undefined ? `${Math.max(0, 100 - window.usedPercent).toFixed(0)}% left` : t("aiAccounts.available")}
+              {window.usedPercent !== undefined
+                ? (window.unit === "requests"
+                  ? `${window.usedPercent.toFixed(0)}% used`
+                  : `${Math.max(0, 100 - window.usedPercent).toFixed(0)}% left`)
+                : t("aiAccounts.available")}
             </div>
           )}
           {window.usedPercent !== undefined ? (
@@ -205,8 +212,15 @@ function WindowCard({ window }: { window: UsageLimitWindow }) {
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                 <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(0, window.usedPercent))}%` }} />
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{window.usedPercent.toFixed(0)}% used</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {window.unit === "requests"
+                  ? `${Math.max(0, 100 - window.usedPercent).toFixed(0)}% requests remaining`
+                  : `${window.usedPercent.toFixed(0)}% used`}
+              </div>
             </div>
+          ) : null}
+          {window.unit === "requests" ? (
+            <div className="text-xs text-gray-500 dark:text-gray-400">Displayed using OpenClaw request-quota data</div>
           ) : null}
           {window.resetAt !== undefined ? (
             <div className="text-xs text-gray-500 dark:text-gray-400">{formatResetTime(window.resetAt)}</div>
